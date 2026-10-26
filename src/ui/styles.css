@@ -72,6 +72,7 @@ button { font: inherit; color: inherit; }
 }
 .sentences button.on { border-color: var(--accent); background: var(--accent-soft); }
 .sentences button.done { color: var(--ok); }
+.sentences button:disabled { cursor: not-allowed; opacity: 0.4; background: transparent; border-style: dashed; }
 
 .intro { margin-top: 32px; }
 .muted { color: var(--muted); }
@@ -138,7 +139,7 @@ button.tok:hover .word { text-decoration: underline; text-decoration-color: var(
 .choice-hint { font-size: 12px; color: var(--muted); }
 button.primary { background: var(--accent); color: #fff; border: 1px solid var(--accent); padding: 8px 16px; border-radius: 6px; cursor: pointer; }
 button.primary:disabled { opacity: 0.4; cursor: default; }
-button.link { background: none; border: none; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 4px 0; }
+button.link, a.link { background: none; border: none; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 4px 0; }
 
 .identify .search {
   width: 100%; font: inherit; font-size: 18px; padding: 10px 12px; border-radius: 6px;
@@ -195,7 +196,7 @@ button.link { background: none; border: none; color: var(--muted); text-decorati
 .seg button.on { background: var(--accent); color: #fff; }
 
 .error { margin: 14px 0 0; padding: 10px 12px; border-radius: 6px; background: var(--err-soft); color: var(--err); }
-.actions { margin-top: 12px; }
+.actions { margin-top: 12px; display: flex; gap: 20px; align-items: center; }
 
 @media (max-width: 600px) {
   .slot .word { font-size: 20px; }

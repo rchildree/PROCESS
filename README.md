@@ -40,3 +40,14 @@ in `src/core/data/alternates.ts`.
 
 Function labels live in `src/core/data/labels.ts`; copular/factitive verb lists in
 `src/core/data/copular.ts`; ending tables in `src/core/data/endings.ts`.
+
+Sentences are worked in order: a student can open any sentence they've finished plus the first
+unfinished one, never one further ahead.
+
+## Printable worksheet
+
+`print.html` (linked as **Printable worksheet** under each sentence) prints a set with the
+student's saved parsing (labels, forms, arrows), the dictionary entries they looked up, and ruled
+lines for a translation. Use the browser's print dialog to save it as a PDF. It lives apart from
+the app in `print.html` and `src/print/`; to drop it, delete those, the `print` input in
+`vite.config.ts`, and the link in `src/ui/App.tsx`.

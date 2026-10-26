@@ -69,3 +69,10 @@ export function doneSet(setId: string): Set<number> {
   const v = read<unknown>(doneKey(setId), [])
   return new Set(Array.isArray(v) ? v.filter((x): x is number => typeof x === 'number') : [])
 }
+
+/** The furthest sentence a student may open: the first one not yet finished. Earlier ones stay open for review. */
+export function frontierOf(done: Set<number>, count: number): number {
+  let i = 0
+  while (i < count - 1 && done.has(i)) i++
+  return i
+}

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { lex } from '../helpers/lex.ts'
 import { tokenize } from '../../src/core/sets.ts'
 import { replay, startSession, submit, type Answer } from '../../src/core/session.ts'
-import { clearLog, doneSet, loadLog, markDone, saveLog } from '../../src/ui/progress.ts'
+import { clearLog, doneSet, frontierOf, loadLog, markDone, saveLog } from '../../src/ui/progress.ts'
 
 beforeEach(() => localStorage.clear())
 afterEach(() => vi.restoreAllMocks())
@@ -42,5 +42,20 @@ describe('progress', () => {
   test('saveLog survives storage that throws', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('full') })
     expect(() => saveLog('s', 0, [])).not.toThrow()
+  })
+})
+
+describe('frontierOf', () => {
+  test('nothing done: only the first sentence is open', () => {
+    expect(frontierOf(new Set(), 5)).toBe(0)
+  })
+  test('opens up to the first unfinished sentence', () => {
+    expect(frontierOf(new Set([0, 1]), 5)).toBe(2)
+  })
+  test('a gap stops the frontier, even if later ones are done', () => {
+    expect(frontierOf(new Set([0, 2, 3]), 5)).toBe(1)
+  })
+  test('all done: stays on the last sentence', () => {
+    expect(frontierOf(new Set([0, 1, 2]), 3)).toBe(2)
   })
 })

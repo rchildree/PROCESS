@@ -5,7 +5,7 @@ import type { SentenceSet, SetIndexItem } from '../core/sets.ts'
 import { cancelEdit, replay, startEdit, submit, type Answer, type SessionState } from '../core/session.ts'
 import type { LookupMode } from '../core/headword.ts'
 import type { Lexicon } from '../core/types.ts'
-import { clearLog, doneSet, loadMode, loadProgress, markDone, saveLog, saveMode } from './progress.ts'
+import { clearLog, doneSet, frontierOf, loadMode, loadProgress, markDone, saveLog, saveMode } from './progress.ts'
 import { SentenceView } from './SentenceView.tsx'
 import { Workbench } from './Workbench.tsx'
 import './styles.css'
@@ -46,9 +46,12 @@ export default function App() {
       const r = await fetch(`./sets/${item.file}`)
       if (!r.ok) throw new Error('Could not load that set.')
       const s: SentenceSet = await r.json()
+      const d = doneSet(s.id)
+      const front = frontierOf(d, s.sentences.length)
       setSet(s)
-      setDone(doneSet(s.id))
-      setSentence(sentenceIdx !== undefined && sentenceIdx < s.sentences.length ? sentenceIdx : null)
+      setDone(d)
+      // Sentences are worked in order: open the requested one only if it isn't past the first unfinished one.
+      setSentence(sentenceIdx !== undefined && sentenceIdx <= front ? sentenceIdx : front)
     } catch (e) {
       setLoadError((e as Error).message)
     }
@@ -98,6 +101,8 @@ export default function App() {
 
   const changeMode = (m: LookupMode) => { setMode(m); saveMode(m) }
 
+  const frontier = set ? frontierOf(done, set.sentences.length) : 0
+
   const reviewable = useMemo(() => new Set(st?.trace.map((t) => t.word) ?? []), [st])
 
   const restart = () => {
@@ -139,16 +144,20 @@ export default function App() {
 
       {set && (
         <nav className="sentences" aria-label="Sentences">
-          {set.sentences.map((_, i) => (
-            <button key={i} type="button" className={[i === sentence ? 'on' : '', done.has(i) ? 'done' : ''].join(' ')} onClick={() => setSentence(i)} aria-label={`Sentence ${i + 1}${done.has(i) ? ' (done)' : ''}`}>
-              {i + 1}{done.has(i) ? ' ✓' : ''}
-            </button>
-          ))}
+          {set.sentences.map((_, i) => {
+            const locked = i > frontier
+            return (
+              <button key={i} type="button" disabled={locked} className={[i === sentence ? 'on' : '', done.has(i) ? 'done' : '', locked ? 'locked' : ''].filter(Boolean).join(' ')}
+                onClick={() => setSentence(i)} title={locked ? 'Finish the earlier sentences first' : undefined}
+                aria-label={`Sentence ${i + 1}${done.has(i) ? ' (done)' : locked ? ' (locked)' : ''}`}>
+                {i + 1}{done.has(i) ? ' ✓' : ''}
+              </button>
+            )
+          })}
         </nav>
       )}
 
       {!set && <p className="muted intro">Choose a sentence set to begin. You'll work through each sentence one word at a time.</p>}
-      {set && sentence === null && <p className="muted intro">Choose a sentence.</p>}
 
       {st && set && sentence !== null && (
         <>
@@ -167,6 +176,8 @@ export default function App() {
           />
           <footer className="actions">
             <button type="button" className="link" onClick={restart}>Restart this sentence</button>
+            {/* Separate printable worksheet (print.html). Remove this link to hide it. */}
+            <a className="link" href={`./print.html?set=${encodeURIComponent(set.id)}`}>Printable worksheet</a>
           </footer>
         </>
       )}
