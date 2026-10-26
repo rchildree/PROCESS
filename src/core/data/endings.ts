@@ -23,7 +23,7 @@ export const FIFTH = t([['es'], ['ei'], ['ei'], ['em'], ['e'], ['es']], [['es'],
 export const ADJ3_MF = merge(THIRD_MF, { nom: { sg: ['is'] }, voc: { sg: ['is'] } })
 export const ADJ3_N = merge(THIRD_N, { nom: { sg: ['e'] }, acc: { sg: ['e'] }, voc: { sg: ['e'] } })
 
-export const PRONOMINAL = ['ius', 'i', 'o', 'um', 'am', 'a', 'ae', 'e', 'ud', 'd', 'c', 's', 'os', 'as', 'orum', 'arum', 'is', 'ibus', 'es', 'ia', 'em', 'us', 'ic', 'oc', 'anc', 'unc', 'ac', 'arunc', 'orunc', 'ec', 'ius', 'ui']
+export const PRONOMINAL = ['ius', 'i', 'o', 'um', 'am', 'a', 'ae', 'e', 'ud', 'd', 'c', 's', 'os', 'as', 'orum', 'arum', 'is', 'ibus', 'es', 'ia', 'em', 'us', 'ic', 'oc', 'anc', 'unc', 'ac', 'arunc', 'orunc', 'ec', 'ius', 'ui', 'obus', 'abus', 'ium']
 
 export function merge(...tables: EndingTable[]): EndingTable {
   const out: EndingTable = {}
@@ -67,4 +67,4 @@ export function markersFor(t: string, m: string, cls: string | undefined): strin
   return ['']
 }
 
-export const INFINITIVE = ['re', 'ri', 'i', 'isse', 'esse', 'se', 'ere', 'are', 'ire']
+export const INFINITIVE = ['re', 'ri', 'i', 'isse', 'esse', 'se', 'ere', 'are', 'ire', 'le', 'lle']

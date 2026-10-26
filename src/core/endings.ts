@@ -63,7 +63,8 @@ export function checkNominalEnding(lex: Lexicon, entryId: string, surface: strin
   for (const a of analyses) {
     const p = paradigmFor(entry, a)
     if (p === 'pron') {
-      if (e && (PRONOMINAL.includes(e) || (tableFor('any', a.g!)[a.c!]?.[a.n!] ?? []).includes(e))) return yes
+      const table = tableFor('any', a.g!)[a.c!]?.[a.n!] ?? []
+      if (e ? PRONOMINAL.includes(e) || table.includes(e) : table.includes('')) return yes
       continue
     }
     const allowed = tableFor(p, a.g!)[a.c!]?.[a.n!] ?? []

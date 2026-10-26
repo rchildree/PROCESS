@@ -1,6 +1,5 @@
 import type { Lexicon } from '../core/types.ts'
 import { activeIndex, findCompound, optionsFor, surfaceOf, type Answer, type SessionState } from '../core/session.ts'
-import { analysesFor } from '../core/endings.ts'
 import type { UiPos } from '../core/checks.ts'
 import { ChoiceStep } from './steps/ChoiceStep.tsx'
 import { EndingSelector } from './steps/EndingSelector.tsx'
@@ -41,7 +40,7 @@ export function Workbench({ st, lex, onAnswer, onNext }: Props) {
       body = <EndingSelector word={surface} onSubmit={(e) => onAnswer({ step: 'ending', ending: e ?? '' })} />
       break
     case 'nomForm':
-      title = isPtc ? 'Case, number, and gender of the participle?' : 'Case, number, and gender?'
+      title = 'Case, number, and gender?'
       body = <NomFormPicker options={options} onSubmit={(form) => onAnswer({ step: 'nomForm', form })} />
       break
     case 'nomRole': {
@@ -59,12 +58,12 @@ export function Workbench({ st, lex, onAnswer, onNext }: Props) {
       body = <EndingSelector word={surface} offset={[...(w.personal ?? '')].length} allowNone onSubmit={(marker) => onAnswer({ step: 'marker', marker })} />
       break
     case 'infEnding':
-      title = 'Mark the infinitive ending.'
+      title = 'Mark the ending.'
       body = <EndingSelector word={surface} onSubmit={(e) => onAnswer({ step: 'infEnding', ending: e ?? '' })} />
       break
     case 'verbForm': {
       title = 'Parse the verb.'
-      const kinds = w.path === 'inf' ? (['inf'] as const) : analysesFor(lex, w.entryId!, surface).some((a) => a.k === 'imp') ? (['fin', 'imp'] as const) : (['fin'] as const)
+      const kinds = w.path === 'inf' ? (['inf'] as const) : (['fin', 'imp'] as const)
       body = <VerbFormPicker key={`${i}-vf`} options={options} kinds={[...kinds]} onSubmit={(form) => onAnswer({ step: 'verbForm', form })} />
       break
     }

@@ -1,3 +1,4 @@
+import { tokenProblems } from './completable.ts'
 import type { Gloss, Lexicon, Pos } from './types.ts'
 
 export interface Token { index: number; surface: string; host?: string; enclitic?: 'que' | 'ne' | 've'; punctAfter?: string; punctBefore?: string }
@@ -138,7 +139,9 @@ export function validateSet(set: SentenceSet, lex: Lexicon): string[] {
     for (const t of s.tokens) {
       const w = t.host ?? t.surface
       const low = w[0].toLowerCase() + w.slice(1)
-      if (!lex.lookup(w).length && !glossed.has(w) && !glossed.has(low)) problems.push(`sentence ${i + 1}: "${w}" not found`)
+      if (glossed.has(w) || glossed.has(low)) continue
+      const p = tokenProblems(lex, t)
+      if (p) problems.push(`sentence ${i + 1}: ${p}`)
     }
   })
   if (!set.sentences.length) problems.push('no sentences found')

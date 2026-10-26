@@ -23,6 +23,8 @@ const POS_MAP: Record<Pos, UiPos[]> = {
 }
 const DEMONSTRATIVE_PRON = new Set(['hic-pron', 'is-pron', 'idem-pron'])
 const PRONOMINAL_ADJ = new Set(['ille-adj', 'iste-adj', 'ipse-adj', 'unus-adj'])
+/** Defective verbs the dataset files under 'other'. */
+const VERB_LIKE = new Set(['ait-other', 'inquit-other'])
 
 export function allowedPos(lex: Lexicon, surface: string, entryId: string): UiPos[] {
   const e = lex.entries.get(entryId)
@@ -30,6 +32,13 @@ export function allowedPos(lex: Lexicon, surface: string, entryId: string): UiPo
   const out = new Set(POS_MAP[e.pos])
   if (DEMONSTRATIVE_PRON.has(entryId)) out.add('ADJ')
   if (PRONOMINAL_ADJ.has(entryId)) out.add('PRO')
+  if (e.pos === 'other' || e.pos === 'particle') {
+    const d = e.definition.toLowerCase()
+    if (/(subord\. conj|coord\. conj|sentence connector)/.test(d)) out.add('CONJ')
+    if (/(question word|interrogative adv|intensifier|sentence connector|\badv\b|adv\.)/.test(d)) out.add('ADV')
+    if (/indecl\. adj/.test(d)) out.add('ADJ')
+    if (VERB_LIKE.has(entryId)) out.add('V')
+  }
   if (e.pos === 'v') {
     const a = analysesFor(lex, entryId, surface)
     if (a.length && a.every((x) => x.k === 'ptc' || x.k === 'ger')) out.add('ADJ')
@@ -52,9 +61,9 @@ export function checkNomForm(lex: Lexicon, surface: string, entryId: string, f: 
   return no(`This form cannot be ${CASE_NAME[f.c]} ${f.n === 'sg' ? 'singular' : 'plural'}.`)
 }
 
-export function checkNounLabel(f: NomForm, label: Label, openPP: { case: Case } | null): Check {
+export function checkNounLabel(f: NomForm, label: Label, openPP: { case: Case; soft?: boolean } | null): Check {
   if (!NOUN_LABELS.includes(label)) return no('That label is not for nouns.')
-  if (openPP && f.c === openPP.case && label !== 'PP') return no('This word is in the case the preposition takes.')
+  if (openPP && !openPP.soft && f.c === openPP.case && label !== 'PP') return no('This word is in the case the preposition takes.')
   if (label === 'PP') {
     if (!openPP) return no('There is no preposition for this word to belong to.')
     if (openPP.case !== f.c) return no(`The preposition does not take the ${CASE_NAME[f.c]}.`)
@@ -74,14 +83,17 @@ export function checkAgreement(adj: NomForm, noun: NomForm): Check {
 }
 
 function sameVerbForm(a: VerbForm, b: Partial<VerbForm> & { k?: string }): boolean {
-  if (a.k !== b.k || a.t !== b.t || a.v !== b.v) return false
+  if (a.k !== b.k) return false
+  if (a.k === 'imp') return a.n === b.n && (b.v === undefined || a.v === b.v)
+  if (a.t !== b.t || a.v !== b.v) return false
   if (a.k === 'inf') return true
-  if (a.k === 'imp') return a.n === b.n
   return a.m === b.m && a.p === b.p && a.n === b.n
 }
 
 export function checkVerbForm(lex: Lexicon, surface: string, entryId: string, f: VerbForm): Check {
   const all = analysesFor(lex, entryId, surface)
+  const deponent = !!lex.entries.get(entryId)?.flags.includes('deponent')
+  if (f.k === 'imp' && f.v === 'pass' && !deponent && all.some((a) => a.k === 'imp' && a.v === undefined)) return no('This form cannot be parsed that way.')
   if (all.some((a) => a.k === f.k && sameVerbForm(f, { ...a, k: a.k as VerbForm['k'], t: a.t ?? (a.k === 'imp' ? 'pres' : undefined) } as VerbForm))) return yes
   return no('This form cannot be parsed that way.')
 }
@@ -117,7 +129,7 @@ export function checkPrepCase(entry: Entry, c: Case): Check {
 
 export function checkConjType(entry: Entry, t: '+' | '↓'): Check {
   const d = entry.definition.toLowerCase()
-  const coord = d.includes('coord')
+  const coord = d.includes('coord') || d.includes('sentence connector')
   const sub = d.includes('subord')
   if (t === '+') return coord ? yes : no('This conjunction is not coordinating.')
   return sub || !coord ? yes : no('This conjunction is not subordinating.')

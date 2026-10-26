@@ -62,7 +62,9 @@ export interface SessionState {
   current: number
   step: StepId
   words: WordState[]
-  openPP: { prep: number; c: Case } | null
+  openPP: { prep: number; c: Case; soft?: boolean; conj?: number } | null
+  /** The prepositional phrase that just closed, so a following + can extend it (ex agrō et aquā). */
+  lastPP: { prep: number; c: Case; closer: number } | null
   clauses: { conj: number; hasFiniteVerb: boolean }[]
   pendingLinkCandidates: number[]
   resolving: number | null
@@ -96,7 +98,8 @@ const isGloss = (id?: string) => !!id && id.startsWith('gloss:')
 
 /** A word that can be the noun an adjective points to. */
 export function isNounLike(w: WordState): boolean {
-  if (!w.nomForm || !w.role) return false
+  if (!w.role) return false
+  if (!w.nomForm && w.path !== 'none') return false
   if (w.role.kind === 'substantive') return true
   return w.role.kind === 'label' && (w.pos === 'N' || w.pos === 'PRO')
 }
@@ -126,6 +129,7 @@ export function startSession(tokens: Token[]): SessionState {
     step: tokens.length ? 'identify' : 'done',
     words: tokens.map(() => ({ clauseDepth: 0, done: false })),
     openPP: null,
+    lastPP: null,
     clauses: [],
     pendingLinkCandidates: [],
     resolving: null,
@@ -150,6 +154,9 @@ function finishWord(st: SessionState): SessionState {
     return { ...withWord(st, i, { enclitic: { done: false } }), step: 'encliticPos' }
   }
   st = withWord(st, i, { done: true })
+  if (st.openPP?.soft && st.openPP.conj !== i && (isNounLike(st.words[i]) || ['V', 'PREP', 'CONJ'].includes(st.words[i].pos ?? ''))) {
+    st = { ...st, openPP: null }
+  }
   const top = st.clauses[st.clauses.length - 1]
   if (top && top.conj !== i) return { ...st, step: 'clauseBoundary' }
   return advance(st)
@@ -176,7 +183,7 @@ function afterNounLike(st: SessionState): SessionState {
   if (!isNounLike(w)) return finishWord(st)
   const cands = st.words
     .map((x, j) => ({ x, j }))
-    .filter(({ x, j }) => j < i && x.role?.kind === 'pendingNoun' && x.nomForm && checkAgreement(x.nomForm, w.nomForm!).ok)
+    .filter(({ x, j }) => j < i && x.role?.kind === 'pendingNoun' && (!x.nomForm || !w.nomForm || checkAgreement(x.nomForm, w.nomForm).ok))
     .map(({ j }) => j)
   if (!cands.length) return finishWord(st)
   return { ...st, pendingLinkCandidates: cands, step: 'linkPending' }
@@ -185,7 +192,8 @@ function afterNounLike(st: SessionState): SessionState {
 function closePPIfObject(st: SessionState, i: number): SessionState {
   const w = st.words[i]
   const label = w.role?.kind === 'label' || w.role?.kind === 'substantive' ? w.role.label : null
-  return label === 'PP' ? { ...st, openPP: null } : st
+  if (label !== 'PP' || !st.openPP) return st
+  return { ...st, openPP: null, lastPP: { prep: st.openPP.prep, c: st.openPP.c, closer: i } }
 }
 
 // ---------- role checks ----------
@@ -193,8 +201,8 @@ function closePPIfObject(st: SessionState, i: number): SessionState {
 function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon, resolving: boolean): Check {
   const w = st.words[i]
   const form = w.nomForm
-  const openPP = resolving ? null : st.openPP ? { case: st.openPP.c } : null
-  const gloss = isGloss(w.entryId)
+  const openPP = resolving ? null : st.openPP ? { case: st.openPP.c, soft: st.openPP.soft } : null
+  const gloss = isGloss(w.entryId) || (w.path === 'none' && !form)
   const no = (reason: string): Check => ({ ok: false, reason })
 
   if (w.pos === 'ADV') {
@@ -220,7 +228,7 @@ function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon,
       if (!t || role.target === i) return no('Choose a noun in the sentence.')
       if (!resolving && role.target > i) return no('That word has not been reached yet.')
       if (!isNounLike(t)) return no('That word is not being used as a noun.')
-      return form ? checkAgreement(form, t.nomForm!) : { ok: true }
+      return form && t.nomForm ? checkAgreement(form, t.nomForm) : { ok: true }
     }
     case 'pendingNoun':
       if (resolving) return no('The sentence is finished — decide now.')
@@ -245,7 +253,7 @@ function checkVerbRole(st: SessionState, i: number, role: Role, lex: Lexicon, re
   const w = st.words[i]
   const no = (reason: string): Check => ({ ok: false, reason })
   if (role.kind === 'label') {
-    if (isGloss(w.entryId)) return VERB_LABELS.includes(role.label) ? { ok: true } : no('That label is not for verbs.')
+    if (isGloss(w.entryId) || (w.path === 'none' && !w.verbForm)) return VERB_LABELS.includes(role.label) ? { ok: true } : no('That label is not for verbs.')
     return w.verbForm && w.entryId ? checkVerbLabel(lex, w.entryId, w.verbForm, role.label) : no('Missing verb form.')
   }
   if (role.kind === 'aux') {
@@ -300,11 +308,14 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
         if (a.pos === 'OTHER') return finishWord(withWord(st, i, { path: 'none' }))
         return { ...withWord(st, i, { path: 'none' }), step: 'nomRole' }
       }
+      const anAll = analysesFor(lex, w.entryId!, surface)
+      if (!anAll.length && (a.pos === 'N' || a.pos === 'ADJ' || a.pos === 'PRO')) return { ...withWord(st, i, { path: 'none' }), step: 'nomRole' }
+      if (!anAll.length && a.pos === 'V') return { ...withWord(st, i, { path: 'none' }), step: 'verbRole' }
       switch (a.pos) {
         case 'N': case 'ADJ': case 'PRO':
           return { ...withWord(st, i, { path: 'nominal' }), step: 'ending' }
         case 'V': {
-          const an = analysesFor(lex, w.entryId!, surface)
+          const an = anAll
           if (an.length && an.every((x) => x.k === 'ptc' || x.k === 'ger')) return { ...withWord(st, i, { path: 'nominal' }), step: 'ending' }
           if (an.some((x) => x.k === 'inf')) return { ...withWord(st, i, { path: 'inf' }), step: 'infEnding' }
           return { ...withWord(st, i, { path: 'finite' }), step: 'personal' }
@@ -431,6 +442,9 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
         if (!c.ok) return fail(st, c.reason)
       }
       st = withWord(st, i, { conjType: a.t, role: { kind: 'label', label: a.t } })
+      if (a.t === '+' && st.lastPP && st.lastPP.closer === i - 1) {
+        st = { ...st, openPP: { prep: st.lastPP.prep, c: st.lastPP.c, soft: true, conj: i }, lastPP: null }
+      }
       if (a.t === '↓') {
         const clauses = [...st.clauses, { conj: i, hasFiniteVerb: false }]
         st = withWord({ ...st, clauses }, i, { clauseDepth: clauses.length })

@@ -134,6 +134,26 @@ export function generateForms(entries: Map<string, Entry>, rows: SurfaceSource[]
     }
   }
 
+  // Numerals duo and trēs (the dataset lists them without forms).
+  const nf = (c: Case, n: Num, g: Gender): Analysis => ({ k: 'nom', c, n, g })
+  if (entries.has('duo-num')) {
+    const D: [string, Analysis[]][] = [
+      ['duo', [nf('nom', 'pl', 'm'), nf('nom', 'pl', 'n'), nf('acc', 'pl', 'm'), nf('acc', 'pl', 'n'), nf('voc', 'pl', 'm'), nf('voc', 'pl', 'n')]],
+      ['duae', [nf('nom', 'pl', 'f'), nf('voc', 'pl', 'f')]], ['duōs', [nf('acc', 'pl', 'm')]], ['duās', [nf('acc', 'pl', 'f')]],
+      ['duōrum', [nf('gen', 'pl', 'm'), nf('gen', 'pl', 'n')]], ['duārum', [nf('gen', 'pl', 'f')]],
+      ['duōbus', [nf('dat', 'pl', 'm'), nf('dat', 'pl', 'n'), nf('abl', 'pl', 'm'), nf('abl', 'pl', 'n')]],
+      ['duābus', [nf('dat', 'pl', 'f'), nf('abl', 'pl', 'f')]],
+    ]
+    for (const [w, a] of D) add(w, 'duo-num', a)
+  }
+  if (entries.has('tres-num')) {
+    const all = (c: Case) => (['m', 'f', 'n'] as Gender[]).map((g) => nf(c, 'pl', g))
+    add('trēs', 'tres-num', [nf('nom', 'pl', 'm'), nf('nom', 'pl', 'f'), nf('acc', 'pl', 'm'), nf('acc', 'pl', 'f'), nf('voc', 'pl', 'm'), nf('voc', 'pl', 'f')])
+    add('tria', 'tres-num', [nf('nom', 'pl', 'n'), nf('acc', 'pl', 'n'), nf('voc', 'pl', 'n')])
+    add('trium', 'tres-num', all('gen'))
+    add('tribus', 'tres-num', [...all('dat'), ...all('abl')])
+  }
+
   // Forms the dataset still does not emit.
   if (entries.has('domus-n')) add('domī', 'domus-n', [{ k: 'nom', c: 'loc', n: 'sg', g: 'f' }])
   const pass3 = (l: string, w: string) => entries.has(l) && add(w, l, [{ k: 'fin', t: 'pres', m: 'ind', v: 'pass', p: '3', n: 'sg' }])
