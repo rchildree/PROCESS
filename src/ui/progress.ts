@@ -1,8 +1,8 @@
 // Per-device progress in localStorage. Every access is guarded: storage may be blocked or full.
 import type { Answer } from '../core/session.ts'
 
-const logKey = (setId: string, i: number) => `saban:v1:log:${setId}:${i}`
-const doneKey = (setId: string) => `saban:v1:done:${setId}`
+const logKey = (setId: string, i: number) => `process:v1:log:${setId}:${i}`
+const doneKey = (setId: string) => `process:v1:done:${setId}`
 
 function read<T>(key: string, fallback: T): T {
   try {

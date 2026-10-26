@@ -9,7 +9,7 @@ import { SentenceView } from './SentenceView.tsx'
 import { Workbench } from './Workbench.tsx'
 import './styles.css'
 
-const LAST_KEY = 'saban:v1:last'
+const LAST_KEY = 'process:v1:last'
 
 function readLast(): { setId?: string; i?: number } {
   try { return JSON.parse(localStorage.getItem(LAST_KEY) ?? '{}') } catch { return {} }
@@ -88,7 +88,7 @@ export default function App() {
   return (
     <main className="app">
       <header className="top">
-        <h1>Saban <span>· the process</span></h1>
+        <h1>PROCESS</h1>
         <label className="set-picker">
           <span>Sentence set</span>
           <select

@@ -1,4 +1,4 @@
-# Saban: the process
+# PROCESS
 
 A step-by-step Latin parsing drill. Students see one word at a time and must answer a fixed
 sequence of questions about it (dictionary entry, part of speech, ending, case/number/gender or
