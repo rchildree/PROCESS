@@ -74,3 +74,12 @@ describe('withGlosses', () => {
     expect(g.lookup('puer').map((c) => c.entryId)).toContain('puer-n')
   })
 })
+
+describe('search ranking', () => {
+  test('slash alternatives count as exact matches', () => {
+    expect(lex().search('ab')[0].id).toBe('a-prep')
+  })
+  test('sum first for sum', () => {
+    expect(lex().search('sum')[0].id).toBe('sum-v')
+  })
+})

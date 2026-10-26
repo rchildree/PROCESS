@@ -53,8 +53,9 @@ class LexiconImpl implements Lexicon {
     for (const e of this.entries.values()) {
       const lk = searchKey(e.lemma).replace(/^-/, '')
       const dk = searchKey(e.dict)
+      const alts = e.dict.includes('/') && !e.dict.includes(' ') ? e.dict.split('/').map(searchKey) : []
       let r = -1
-      if (lk === q) r = 0
+      if (lk === q || alts.includes(q)) r = 0
       else if (lk.startsWith(q)) r = 1
       else if (dk.split(/[\s,/()]+/).some((w) => w.startsWith(q))) r = 2
       else if (dk.includes(q)) r = 3

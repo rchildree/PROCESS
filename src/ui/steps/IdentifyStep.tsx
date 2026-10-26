@@ -35,7 +35,7 @@ export function IdentifyStep({ lex, onPick }: Props) {
         <ul className="results" role="listbox">
           {results.length === 0 && <li className="empty">No matches.</li>}
           {results.map((e, i) => (
-            <li key={e.id} role="option" aria-selected={i === hi} className={i === hi ? 'hi' : ''} onMouseEnter={() => setHi(i)} onClick={() => onPick(e.id)}>
+            <li key={e.id} role="option" aria-selected={i === hi} className={i === hi ? 'hi' : ''} onMouseMove={() => setHi(i)} onClick={() => onPick(e.id)}>
               <span className="dict">{e.dict}</span>
               <span className="def">{e.definition}</span>
             </li>

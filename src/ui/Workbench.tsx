@@ -95,7 +95,7 @@ export function Workbench({ st, lex, onAnswer, onNext }: Props) {
           {st.pendingLinkCandidates.map((t) => (
             <button key={t} type="button" onClick={() => onAnswer({ step: 'linkPending', target: t })}><em>{wordAt(t)}</em> goes with it</button>
           ))}
-          <button type="button" onClick={() => onAnswer({ step: 'linkPending', target: null })}>{st.pendingLinkCandidates.length ? 'No (more)' : 'No'}</button>
+          <button type="button" onClick={() => onAnswer({ step: 'linkPending', target: null })}>No</button>
         </div>
       )
       break
