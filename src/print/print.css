@@ -21,51 +21,46 @@
 }
 .ws-note { width: 100%; margin: 0; font-size: 13px; }
 
+/* The sheet is black and white, on screen and on paper, so the preview matches the print. */
 .ws-page {
-  width: var(--sheet); max-width: 100%; margin: 0 auto 48px; padding: 32px 0; background: var(--panel);
-  box-shadow: 0 0 0 1px var(--line); color: var(--ink);
+  --ink: #000; --muted: #444; --line: #bbb; --accent: #000; --ante: #000; --pp: #000;
+  --clause-1: #eee; --clause-2: #e2e2e2; --clause-3: #d6d6d6;
+  width: var(--sheet); max-width: 100%; margin: 0 auto 48px; padding: 32px 0; background: #fff;
+  box-shadow: 0 0 0 1px #ccc; color: #000; font-size: 11pt;
 }
 .ws-page > * { margin-left: 32px; margin-right: 32px; }
 
-.ws-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; border-bottom: 2px solid var(--ink); padding-bottom: 10px; margin-bottom: 8px; }
-.ws-brand { font-size: 11px; letter-spacing: 0.14em; color: var(--muted); font-weight: 600; }
-.ws-head h1 { font-family: var(--serif); font-size: 22px; font-weight: 600; margin: 2px 0 0; }
-.ws-fields { display: flex; flex-direction: column; gap: 10px; font-size: 13px; min-width: 200px; }
-.ws-fields span { display: flex; gap: 8px; align-items: end; }
-.ws-fields i { flex: 1; border-bottom: 1px solid var(--ink); height: 16px; }
+.ws-title { font-family: var(--serif); font-size: 13pt; font-weight: 600; margin-top: 0; margin-bottom: 4px; }
 
-.ws-item { display: flex; gap: 10px; padding: 14px 0 6px; break-inside: avoid; page-break-inside: avoid; border-bottom: 1px solid var(--line); }
+.ws-item { display: flex; gap: 6px; padding: 10px 0 4px; break-inside: avoid; page-break-inside: avoid; border-bottom: 0.5px solid #ccc; }
 .ws-item:last-child { border-bottom: none; }
-.ws-num { font-family: var(--serif); font-size: 18px; font-weight: 600; min-width: 30px; padding-top: 4px; }
-.ws-item:has(.sentence-wrap) .ws-num { padding-top: 30px; }
+.ws-num { font-family: var(--serif); font-size: 11pt; font-weight: 600; min-width: 22px; padding-top: 1px; }
+.ws-item:has(.sentence-wrap) .ws-num { padding-top: 19px; }
 .ws-body { flex: 1; min-width: 0; }
 
-/* Slightly smaller sentence than in the app, to fit more on a page. */
-.ws-page .sentence-wrap { margin-bottom: 8px; }
-.ws-page .slot { padding-top: 26px; }
-.ws-page .slot .word { font-size: 19px; line-height: 28px; height: 28px; }
-.ws-page .slot .tok { padding: 1px 5px 4px; min-width: 28px; }
-.ws-page .slot .fn { font-size: 12.5px; height: 19px; line-height: 19px; }
-.ws-page .slot .parse { font-size: 10.5px; }
+/* Sentence view at print size. */
+.ws-page .sentence-wrap { margin-bottom: 4px; }
+.ws-page .slot { padding-top: 18px; }
+.ws-page .slot .word { font-size: 11pt; line-height: 20px; height: 20px; }
+.ws-page .slot .tok { padding: 0 3px 2px; min-width: 20px; }
+.ws-page .slot .fn { font-size: 7.5pt; height: 13px; line-height: 13px; }
+.ws-page .slot .parse { font-size: 6.5pt; line-height: 1.25; padding-top: 1px; }
+.ws-page .arc { stroke-width: 1; }
+.ws-page .arrows { transform: translateY(-4px); }
 
-.ws-latin { font-family: var(--serif); font-size: 19px; line-height: 1.5; margin: 2px 0 8px; }
-.ws-partial { font-size: 11px; color: var(--muted); font-style: italic; margin: 0 0 6px; }
+.ws-latin { font-family: var(--serif); font-size: 11pt; line-height: 1.4; margin: 0 0 4px; }
+.ws-partial { font-size: 7.5pt; color: var(--muted); font-style: italic; margin: 0 0 3px; }
 
-.ws-vocab { list-style: none; padding: 0; margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 2px 16px; font-size: 11.5px; color: var(--muted); }
-.ws-vocab b { font-family: var(--serif); font-weight: 600; color: var(--ink); font-size: 12.5px; }
+.ws-vocab { list-style: none; padding: 0; margin: 0 0 2px; font-size: 8pt; line-height: 1.35; color: var(--muted); }
+.ws-vocab b { font-family: var(--serif); font-weight: 600; color: #000; font-size: 8.5pt; margin-right: 4px; }
 
-.ws-lines { margin-top: 4px; }
-.ws-line { height: 30px; border-bottom: 1px solid #9c968c; }
+.ws-lines { margin-top: 2px; }
+.ws-line { height: 22px; border-bottom: 0.75px solid #777; }
 
 @page { margin: 0.5in; }
 
 @media print {
-  /* Always print in light colours, with clause shading kept. */
-  :root {
-    --bg: #fff; --panel: #fff; --ink: #1f1d1a; --muted: #5d5850; --line: #ddd8ce;
-    --accent: #8a2d1c; --accent-soft: #f3e3dc; --clause-1: #e6eef8; --clause-2: #efe6f6; --clause-3: #e6f3ec;
-    --pp: #b07a1d; --ante: #2a5d8f; color-scheme: light;
-  }
+  :root { --bg: #fff; color-scheme: light; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { background: #fff; }
   .ws-toolbar { display: none; }
@@ -75,5 +70,4 @@
 
 @media (max-width: 760px) {
   .ws-page > * { margin-left: 16px; margin-right: 16px; }
-  .ws-head { flex-direction: column; align-items: stretch; }
 }

@@ -110,16 +110,7 @@ export function Worksheet() {
 
       {set && (
         <article className="ws-page">
-          <header className="ws-head">
-            <div>
-              <div className="ws-brand">PROCESS</div>
-              <h1>{set.title}</h1>
-            </div>
-            <div className="ws-fields">
-              <span>Name <i /></span>
-              <span>Date <i /></span>
-            </div>
-          </header>
+          <h1 className="ws-title">{set.title}</h1>
 
           {items.map((it) => (
             <section key={it.n} className="ws-item">
