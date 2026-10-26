@@ -1,0 +1,17 @@
+{
+ "id": "knudsvig-731",
+ "name": "Knudsvig, Latin for Reading",
+ "version": "2026-09-10",
+ "chapters": 45,
+ "entries": "entries.json",
+ "forms": {
+  "n": "forms.n.json",
+  "adj": "forms.adj.json",
+  "v": "forms.v.json",
+  "pron": "forms.pron.json"
+ },
+ "stats": {
+  "entries": 732,
+  "surfaces": 27879
+ }
+}
