@@ -1,0 +1,5 @@
+node_modules
+dist
+public/sets/
+.superpowers/
+.DS_Store
