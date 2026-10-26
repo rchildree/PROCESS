@@ -265,8 +265,8 @@ function checkVerbRole(st: SessionState, i: number, role: Role, lex: Lexicon, re
 export function submit(st: SessionState, a: Answer, lex: Lexicon): SessionState {
   if (st.step === 'done') return fail(st, 'This sentence is finished.')
   if (a.step !== st.step) return fail(st, 'Answer the current question first.')
-  const next = apply(st, a, lex)
-  if (next.error) return next
+  const next = apply({ ...st, error: null }, a, lex)
+  if (next.error) return { ...next, log: st.log }
   return { ...next, error: null, log: [...st.log, a] }
 }
 

@@ -140,3 +140,12 @@ test('replay of a finished log ends at done', () => {
   expect(again.step).toBe('done')
   expect(again.log).toHaveLength(L10_2_ANSWERS.length)
 })
+
+test('a correct answer after a rejected one is logged and clears the error', () => {
+  const st = play(L10_2, [{ step: 'identify', entryId: 'medicus-n' }])
+  const bad = submit(st, { step: 'pos', pos: 'V' }, lex())
+  const good = submit(bad, { step: 'pos', pos: 'N' }, lex())
+  expect(good.error).toBeNull()
+  expect(good.step).toBe('ending')
+  expect(good.log).toHaveLength(2)
+})
