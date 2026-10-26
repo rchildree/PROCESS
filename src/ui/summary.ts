@@ -46,25 +46,28 @@ export function segments(st: SessionState, i: number, words: WordState[] = st.wo
   return [w.stem, ...(w.marker ? [w.marker] : []), end || 'Ø'].join('·')
 }
 
-export function detailsOf(st: SessionState, i: number, words: WordState[] = st.words): string[] {
+/** One line of a word's parse details: grammar terms (shown in small caps) and Latin words (shown as written). */
+export type DetailLine = (string | { la: string })[]
+
+export function detailsOf(st: SessionState, i: number, words: WordState[] = st.words): DetailLine[] {
   const w = words[i]
-  const word = (j: number) => surfaceOf(st.tokens[j])
-  const lines: string[] = []
-  if (w.pos) lines.push(w.pos)
+  const la = (j: number) => ({ la: surfaceOf(st.tokens[j]) })
+  const lines: DetailLine[] = []
+  if (w.pos) lines.push([w.pos])
   const seg = segments(st, i, words)
-  if (seg) lines.push(seg)
-  if (w.nomForm) lines.push(`${CASE_ABBR[w.nomForm.c]} ${w.nomForm.n} ${w.nomForm.g}`)
-  if (w.stemType && w.path === 'nominal') lines.push(participleName(w.stemType, w.marker, false))
-  if (w.verbForm) lines.push(verbText(w.verbForm))
-  if (w.prepCase) lines.push(`+ ${w.prepCase}`)
-  if (w.antecedent !== undefined) lines.push(w.antecedent === null ? 'rel. (no antecedent)' : `rel. → ${word(w.antecedent)}`)
+  if (seg) lines.push([{ la: seg }])
+  if (w.nomForm) lines.push([`${CASE_ABBR[w.nomForm.c]} ${w.nomForm.n} ${w.nomForm.g}`])
+  if (w.stemType && w.path === 'nominal') lines.push([participleName(w.stemType, w.marker, false)])
+  if (w.verbForm) lines.push([verbText(w.verbForm)])
+  if (w.prepCase) lines.push([`+ ${w.prepCase}`])
+  if (w.antecedent !== undefined) lines.push(w.antecedent === null ? ['rel. (no antecedent)'] : ['rel. → ', la(w.antecedent)])
   const r = w.role
-  if (r?.kind === 'modifies') lines.push(`→ ${word(r.target)}`)
-  if (r?.kind === 'substantive') lines.push('subst.')
-  if (r?.kind === 'predicate') lines.push('pred.')
-  if ((r?.kind === 'verbPart' || r?.kind === 'aux') && r.target !== undefined) lines.push(`+ ${word(r.target)}`)
-  if (w.compound?.form) lines.push(verbText(w.compound.form))
-  if (w.enclitic?.done) lines.push(`-${st.tokens[i].enclitic}`)
+  if (r?.kind === 'modifies') lines.push(['→ ', la(r.target)])
+  if (r?.kind === 'substantive') lines.push(['subst.'])
+  if (r?.kind === 'predicate') lines.push(['pred.'])
+  if ((r?.kind === 'verbPart' || r?.kind === 'aux') && r.target !== undefined) lines.push(['+ ', la(r.target)])
+  if (w.compound?.form) lines.push([verbText(w.compound.form)])
+  if (w.enclitic?.done) lines.push([{ la: `-${st.tokens[i].enclitic}` }])
   return lines
 }
 

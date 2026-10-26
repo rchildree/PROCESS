@@ -123,7 +123,11 @@ export function SentenceView({ st, reviewable, reviewing = null, onPickWord }: P
             <>
               <span className="word" ref={(el) => { wordEls.current[i] = el }}>{t.punctBefore}{t.surface}{t.punctAfter}</span>
               <span className="fn">{label}</span>
-              <span className="parse">{showParse ? detailsOf(st, i, words).map((l, j) => <span key={j}>{l}</span>) : null}</span>
+              <span className="parse">{showParse ? detailsOf(st, i, words).map((line, j) => (
+                <span key={j}>{line.map((part, k) => typeof part === 'string'
+                  ? <span key={k} className="gram">{part}</span>
+                  : <span key={k} className="la">{part.la}</span>)}</span>
+              )) : null}</span>
             </>
           )
           return (

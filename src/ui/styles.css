@@ -101,6 +101,8 @@ button.tok:hover .word { text-decoration: underline; text-decoration-color: var(
   border-top: 1px solid var(--line); align-self: stretch; text-align: center;
 }
 .slot .parse { display: flex; flex-direction: column; font-size: 11.5px; color: var(--muted); line-height: 1.3; padding-top: 2px; }
+/* Grammar terms (abl sg f, pf ind act 3sg, ADJ…) in small caps; Latin words inside the details stay as written. */
+.slot .parse .gram { font-variant-caps: all-small-caps; }
 .slot.current .tok { background: var(--accent-soft); }
 .slot.current .word { font-weight: 600; }
 .slot.reviewing .tok { outline: 2px solid var(--accent); outline-offset: -2px; }

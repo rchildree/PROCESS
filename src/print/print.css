@@ -26,39 +26,38 @@
   --ink: #000; --muted: #444; --line: #bbb; --accent: #000; --ante: #000; --pp: #000;
   --clause-1: #eee; --clause-2: #e2e2e2; --clause-3: #d6d6d6;
   width: var(--sheet); max-width: 100%; margin: 0 auto 48px; padding: 32px 0; background: #fff;
-  box-shadow: 0 0 0 1px #ccc; color: #000; font-size: 11pt;
+  box-shadow: 0 0 0 1px #ccc; color: #000; font-size: 9pt;
 }
 .ws-page > * { margin-left: 32px; margin-right: 32px; }
 
-.ws-title { font-family: var(--serif); font-size: 13pt; font-weight: 600; margin-top: 0; margin-bottom: 4px; }
+.ws-title { font-family: var(--serif); font-size: 10.5pt; font-weight: 600; margin-top: 0; margin-bottom: 3px; }
 
-.ws-item { display: flex; gap: 6px; padding: 10px 0 4px; break-inside: avoid; page-break-inside: avoid; border-bottom: 0.5px solid #ccc; }
-.ws-item:last-child { border-bottom: none; }
-.ws-num { font-family: var(--serif); font-size: 11pt; font-weight: 600; min-width: 22px; padding-top: 1px; }
-.ws-item:has(.sentence-wrap) .ws-num { padding-top: 19px; }
+.ws-item { display: flex; gap: 5px; padding: 8px 0 3px; break-inside: avoid; page-break-inside: avoid; }
+.ws-num { font-family: var(--serif); font-size: 9pt; font-weight: 600; min-width: 18px; padding-top: 1px; }
+.ws-item:has(.sentence-wrap) .ws-num { padding-top: 15px; }
 .ws-body { flex: 1; min-width: 0; }
 
 /* Sentence view at print size. */
-.ws-page .sentence-wrap { margin-bottom: 4px; }
-.ws-page .slot { padding-top: 18px; }
-.ws-page .slot .word { font-size: 11pt; line-height: 20px; height: 20px; }
-.ws-page .slot .tok { padding: 0 3px 2px; min-width: 20px; }
-.ws-page .slot .fn { font-size: 7.5pt; height: 13px; line-height: 13px; }
-.ws-page .slot .parse { font-size: 6.5pt; line-height: 1.25; padding-top: 1px; }
+.ws-page .sentence-wrap { margin-bottom: 3px; }
+.ws-page .slot { padding-top: 14px; }
+.ws-page .slot .word { font-size: 9pt; line-height: 16px; height: 16px; }
+.ws-page .slot .tok { padding: 0 4px 2px; min-width: 16px; }
+.ws-page .slot .fn { font-size: 7pt; height: 12px; line-height: 12px; }
+.ws-page .slot .parse { font-size: 7pt; line-height: 1.25; padding-top: 1px; }
 .ws-page .arc { stroke-width: 1; }
-.ws-page .arrows { transform: translateY(-4px); }
+.ws-page .arrows { transform: translateY(-3px); }
 
-.ws-latin { font-family: var(--serif); font-size: 11pt; line-height: 1.4; margin: 0 0 4px; }
-.ws-partial { font-size: 7.5pt; color: var(--muted); font-style: italic; margin: 0 0 3px; }
+.ws-latin { font-family: var(--serif); font-size: 9pt; line-height: 1.4; margin: 0 0 3px; }
+.ws-partial { font-size: 6pt; color: var(--muted); font-style: italic; margin: 0 0 3px; }
 
 .ws-vocab {
-  list-style: none; margin: 2px 0 4px; padding: 4px 8px; font-size: 7.5pt; line-height: 1.35; background: none; color: var(--muted);
-  border: 0.75px solid #999; border-radius: 6px;
+  list-style: none; margin: 2px 0 3px; padding: 3px 6px; font-size: 6pt; line-height: 1.35; background: none; color: var(--muted);
+  border: 0.75px solid #999; border-radius: 5px;
 }
-.ws-vocab b { font-family: var(--serif); font-weight: 600; color: #000; font-size: 7.5pt; margin-right: 4px; }
+.ws-vocab b { font-family: var(--serif); font-weight: 600; color: #000; font-size: 6pt; margin-right: 3px; }
 
 .ws-lines { margin-top: 2px; }
-.ws-line { height: 22px; border-bottom: 0.75px solid #777; }
+.ws-line { height: 18px; border-bottom: 0.75px solid #777; }
 
 @page { margin: 0.5in; }
 
