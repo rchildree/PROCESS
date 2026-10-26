@@ -33,5 +33,10 @@ npm run build   # production build into dist/
 First-time GitHub setup: create the repository, push, then in **Settings → Pages** set the
 source to **GitHub Actions**.
 
+Dictionary lookup has three modes, picked at the top of the page: **Help** (search as you type),
+**Normal** (type at least the first part of the entry) and **Real** (type the whole entry). Macrons,
+commas and periods never count. Extra accepted spellings of a first part (like *ac* for *atque*) live
+in `src/core/data/alternates.ts`.
+
 Function labels live in `src/core/data/labels.ts`; copular/factitive verb lists in
 `src/core/data/copular.ts`; ending tables in `src/core/data/endings.ts`.

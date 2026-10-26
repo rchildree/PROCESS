@@ -4,12 +4,14 @@ import {
   checkPrepCase, checkVerbForm, checkVerbLabel, type Label, type NomForm, type UiPos, type VerbForm,
 } from './checks.ts'
 import { NOUN_LABELS, VERB_LABELS } from './data/labels.ts'
-import { analysesFor, checkInfinitiveEnding, checkNominalEnding, checkPersonalEnding, checkVerbSegments } from './endings.ts'
+import { analysesFor, checkInfinitiveEnding, checkNominalEnding, checkPersonalEnding } from './endings.ts'
 import type { Token } from './sets.ts'
+import { checkStem, checkStemType, tensesForStem, type StemType } from './stems.ts'
 import type { Case, Check, Gender, Lexicon, Mood, Num, Person, Tense, Voice } from './types.ts'
 
 export type StepId =
-  | 'identify' | 'pos' | 'ending' | 'nomForm' | 'nomRole' | 'personal' | 'marker' | 'infEnding' | 'verbForm' | 'verbRole'
+  | 'identify' | 'pos' | 'ending' | 'nomForm' | 'nomRole' | 'personal' | 'stem' | 'stemType' | 'infEnding' | 'verbForm' | 'verbRole'
+  | 'relNG' | 'antecedent' | 'relCase'
   | 'compoundForm' | 'compoundRole' | 'prepCase' | 'conjType' | 'linkPending' | 'clauseBoundary' | 'encliticPos'
   | 'encliticConj' | 'resolvePending' | 'done'
 
@@ -26,7 +28,11 @@ export type Answer =
   | { step: 'identify'; entryId: string }
   | { step: 'pos'; pos: UiPos }
   | { step: 'ending' | 'infEnding' | 'personal'; ending: string }
-  | { step: 'marker'; marker: string | null }
+  | { step: 'stem'; stem: string }
+  | { step: 'stemType'; t: StemType }
+  | { step: 'relNG'; n: Num; g: Gender }
+  | { step: 'antecedent'; target: number | null }
+  | { step: 'relCase'; c: Case }
   | { step: 'nomForm'; form: NomForm }
   | { step: 'verbForm' | 'compoundForm'; form: VerbForm }
   | { step: 'nomRole' | 'verbRole' | 'compoundRole' | 'resolvePending'; role: Role }
@@ -45,7 +51,14 @@ export interface WordState {
   path?: 'nominal' | 'finite' | 'inf' | 'none'
   ending?: string
   personal?: string
+  /** Letters from the start of the word up to the marker (verbs and participles). */
+  stem?: string
+  stemType?: StemType
+  /** Whatever sits between the stem and the ending; null when nothing does. */
   marker?: string | null
+  /** Relative pronouns: number and gender (they match the antecedent), then the antecedent itself. */
+  relNG?: { n: Num; g: Gender }
+  antecedent?: number | null
   nomForm?: NomForm
   verbForm?: VerbForm
   role?: Role
@@ -70,6 +83,27 @@ export interface SessionState {
   resolving: number | null
   error: string | null
   log: Answer[]
+  /** Which word and step each logged answer belongs to. */
+  trace: { word: number; step: StepId }[]
+  /** Set while a changed earlier answer is being carried through the rest of the sentence. */
+  editing: Editing | null
+}
+
+export interface Tagged { a: Answer; word: number; step: StepId }
+
+export interface Editing {
+  /** The word whose answer was changed. */
+  word: number
+  /** The original answer at the changed step, so the change can be dropped before it is made. */
+  original: Tagged
+  /** True until the student gives the new answer. */
+  pristine: boolean
+  /** Later answers still waiting to be re-applied. */
+  queue: Tagged[]
+  /** The words as they were before the change, shown faintly until they are re-applied. */
+  ghost: WordState[]
+  /** A later word the change broke: the re-run stopped here. reason null = it needs an answer it never had. */
+  broken: { word: number; reason: string | null } | null
 }
 
 export interface Options {
@@ -95,6 +129,10 @@ export function activeIndex(st: SessionState): number {
 }
 
 const isGloss = (id?: string) => !!id && id.startsWith('gloss:')
+
+/** Relative pronouns: number/gender, antecedent, then case, and they open a ↓ clause. */
+export const RELATIVE_IDS = new Set(['qui-pron-2', 'quicumque-pron', 'quisquis-pron'])
+export const isRelative = (w: WordState) => !!w.entryId && RELATIVE_IDS.has(w.entryId) && w.pos === 'PRO'
 
 /** A word that can be the noun an adjective points to. */
 export function isNounLike(w: WordState): boolean {
@@ -135,6 +173,8 @@ export function startSession(tokens: Token[]): SessionState {
     resolving: null,
     error: null,
     log: [],
+    trace: [],
+    editing: null,
   }
 }
 
@@ -208,6 +248,7 @@ function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon,
   if (w.pos === 'ADV') {
     return role.kind === 'label' && role.label === 'ADV' ? { ok: true } : no('An adverb is labeled ADV.')
   }
+  if (isRelative(w) && role.kind !== 'label') return no('Give the relative pronoun its function in its own clause.')
   switch (role.kind) {
     case 'label':
       if (w.pos === 'ADJ') return no('Say what this adjective does: does it modify a noun, stand as a noun, or act as a predicate?')
@@ -270,12 +311,67 @@ function checkVerbRole(st: SessionState, i: number, role: Role, lex: Lexicon, re
 
 // ---------- submit ----------
 
-export function submit(st: SessionState, a: Answer, lex: Lexicon): SessionState {
+function submitOne(st: SessionState, a: Answer, lex: Lexicon): SessionState {
   if (st.step === 'done') return fail(st, 'This sentence is finished.')
   if (a.step !== st.step) return fail(st, 'Answer the current question first.')
   const next = apply({ ...st, error: null }, a, lex)
-  if (next.error) return { ...next, log: st.log }
-  return { ...next, error: null, log: [...st.log, a] }
+  if (next.error) return { ...next, log: st.log, trace: st.trace }
+  return { ...next, error: null, log: [...st.log, a], trace: [...st.trace, { word: activeIndex(st), step: st.step }] }
+}
+
+export function submit(st: SessionState, a: Answer, lex: Lexicon): SessionState {
+  const next = submitOne(st, a, lex)
+  if (next.error || !next.editing) return next
+  return drain({ ...next, editing: { ...next.editing, pristine: false } }, lex)
+}
+
+// ---------- going back ----------
+
+/** The logged answers, each tagged with its word and step. */
+export function tagged(st: SessionState): Tagged[] {
+  return st.log.map((a, k) => ({ a, word: st.trace[k]?.word ?? -1, step: st.trace[k]?.step ?? a.step }))
+}
+
+/** Go back to logged answer `k` so it can be changed. Later answers are kept and re-applied afterwards. */
+export function startEdit(st: SessionState, k: number, lex: Lexicon): SessionState {
+  const all = [...tagged(st), ...(st.editing?.queue ?? [])]
+  if (k < 0 || k >= st.log.length) return st
+  const base = replay(st.tokens, st.log.slice(0, k), lex)
+  const editing: Editing = {
+    word: all[k].word,
+    original: all[k],
+    pristine: true,
+    queue: all.slice(k + 1),
+    ghost: st.editing?.ghost ?? st.words,
+    broken: null,
+  }
+  return { ...base, editing }
+}
+
+/** Drop a change before it is made: put the original answer back and re-apply the rest. */
+export function cancelEdit(st: SessionState, lex: Lexicon): SessionState {
+  if (!st.editing?.pristine) return st
+  return submit(st, st.editing.original.a, lex)
+}
+
+/** Re-apply waiting answers until one no longer fits or a new question comes up. */
+function drain(st: SessionState, lex: Lexicon): SessionState {
+  const ed = st.editing!
+  let q = ed.queue
+  for (;;) {
+    if (st.step === 'done') return { ...st, editing: null }
+    const cur = st
+    // Answers for words already passed can no longer apply (except end-of-sentence decisions).
+    q = q.filter((t) => (cur.resolving !== null ? t.step === 'resolvePending' : t.step === 'resolvePending' || t.word >= cur.current))
+    if (!q.length) return { ...st, editing: null }
+    const w = activeIndex(st)
+    const idx = q.findIndex((t) => t.word === w && t.step === st.step)
+    if (idx < 0) return { ...st, editing: { ...ed, queue: q, broken: w === ed.word ? null : { word: w, reason: null } } }
+    const next = submitOne(st, q[idx].a, lex)
+    if (next.error) return { ...st, editing: { ...ed, queue: q.slice(idx + 1), broken: { word: w, reason: next.error } } }
+    st = next
+    q = q.slice(idx + 1)
+  }
 }
 
 function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
@@ -331,7 +427,54 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
     case 'ending': {
       const c = checkNominalEnding(lex, w.entryId!, surface, a.ending)
       if (!c.ok) return fail(st, c.reason)
-      return { ...withWord(st, i, { ending: a.ending }), step: 'nomForm' }
+      st = withWord(st, i, { ending: a.ending })
+      if (isRelative(st.words[i])) return { ...st, step: 'relNG' }
+      if (w.pos === 'V') return { ...st, step: 'stem' }
+      return { ...st, step: 'nomForm' }
+    }
+
+    case 'stem': {
+      const endLen = [...(w.path === 'finite' ? w.personal ?? '' : w.ending ?? '')].length
+      const c = checkStem(lex, w.entryId!, surface, endLen, a.stem)
+      if (!c.ok) return fail(st, c.reason)
+      return { ...withWord(st, i, { stem: a.stem }), step: 'stemType' }
+    }
+
+    case 'stemType': {
+      const c = checkStemType(lex, w.entryId!, surface, w.stem ?? '', a.t)
+      if (!c.ok) return fail(st, c.reason)
+      const letters = [...surface.normalize('NFC')]
+      const endLen = [...(w.path === 'finite' ? w.personal ?? '' : w.ending ?? '')].length
+      const middle = letters.slice([...(w.stem ?? '')].length, letters.length - endLen).join('')
+      st = withWord(st, i, { stemType: a.t, marker: middle || null })
+      return { ...st, step: w.path === 'nominal' ? 'nomForm' : 'verbForm' }
+    }
+
+    case 'relNG': {
+      const ok = analysesFor(lex, w.entryId!, surface).some((x) => x.n === a.n && x.g === a.g)
+      if (!ok) return fail(st, 'This form cannot be that number and gender.')
+      return { ...withWord(st, i, { relNG: { n: a.n, g: a.g } }), step: 'antecedent' }
+    }
+
+    case 'antecedent': {
+      if (a.target !== null) {
+        const t = st.words[a.target]
+        if (!t || a.target >= i) return fail(st, 'Choose an earlier word.')
+        if (!isNounLike(t)) return fail(st, 'That word is not being used as a noun.')
+        if (t.nomForm && w.relNG) {
+          if (t.nomForm.n !== w.relNG.n) return fail(st, 'They do not agree in number.')
+          if (t.nomForm.g !== w.relNG.g) return fail(st, 'They do not agree in gender.')
+        }
+      }
+      return { ...withWord(st, i, { antecedent: a.target }), step: 'relCase' }
+    }
+
+    case 'relCase': {
+      const ng = w.relNG!
+      const form: NomForm = { c: a.c, n: ng.n, g: ng.g }
+      const c = checkNomForm(lex, surface, w.entryId!, form)
+      if (!c.ok) return fail(st, c.reason)
+      return { ...withWord(st, i, { nomForm: form }), step: 'nomRole' }
     }
 
     case 'nomForm': {
@@ -350,6 +493,10 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
         return { ...withWord(st, i, { compound }), step: 'compoundForm' }
       }
       st = closePPIfObject(st, i)
+      if (isRelative(st.words[i])) {
+        const clauses = [...st.clauses, { conj: i, hasFiniteVerb: false }]
+        st = withWord({ ...st, clauses }, i, { clauseDepth: clauses.length })
+      }
       return afterNounLike(st)
     }
 
@@ -365,24 +512,20 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
     case 'personal': {
       const c = checkPersonalEnding(lex, w.entryId!, surface, a.ending)
       if (!c.ok) return fail(st, c.reason)
-      return { ...withWord(st, i, { personal: a.ending }), step: 'marker' }
-    }
-
-    case 'marker': {
-      const c = checkVerbSegments(lex, w.entryId!, surface, w.personal ?? '', a.marker)
-      if (!c.ok) return fail(st, c.reason)
-      return { ...withWord(st, i, { marker: a.marker }), step: 'verbForm' }
+      return { ...withWord(st, i, { personal: a.ending }), step: 'stem' }
     }
 
     case 'infEnding': {
       const c = checkInfinitiveEnding(lex, w.entryId!, surface, a.ending)
       if (!c.ok) return fail(st, c.reason)
-      return { ...withWord(st, i, { ending: a.ending }), step: 'verbForm' }
+      return { ...withWord(st, i, { ending: a.ending }), step: 'stem' }
     }
 
     case 'verbForm': {
       if (w.path === 'inf' && a.form.k !== 'inf') return fail(st, 'This is an infinitive.')
       if (w.path === 'finite' && a.form.k === 'inf') return fail(st, 'This form has a personal ending, so it is not an infinitive.')
+      if (w.stemType && a.form.k !== 'imp' && !tensesForStem(w.stemType).includes(a.form.t)) return fail(st, 'That tense is not built on the stem you marked.')
+      if (w.stemType && a.form.k === 'imp' && w.stemType !== 'pres') return fail(st, 'An imperative is built on the present stem.')
       const c = checkVerbForm(lex, surface, w.entryId!, a.form)
       if (!c.ok) return fail(st, c.reason)
       return { ...withWord(st, i, { verbForm: a.form }), step: 'verbRole' }
@@ -513,6 +656,9 @@ export function optionsFor(st: SessionState, lex: Lexicon): Options {
   switch (st.step) {
     case 'pos': case 'encliticPos': return { pos: ALL_POS }
     case 'nomForm': return { cases: ALL_CASES, numbers: ALL_NUMBERS, genders: ALL_GENDERS }
+    case 'relNG': return { numbers: ALL_NUMBERS, genders: ALL_GENDERS }
+    case 'relCase': return { cases: ALL_CASES }
+    case 'antecedent': return { nounTargets }
     case 'verbForm': case 'compoundForm': return { persons: ALL_PERSONS, numbers: ALL_NUMBERS, tenses: ALL_TENSES, moods: ALL_MOODS, voices: ALL_VOICES }
     case 'prepCase': return { cases: ['acc', 'abl'] }
     case 'nomRole': {

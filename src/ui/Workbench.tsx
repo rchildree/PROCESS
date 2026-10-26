@@ -1,18 +1,87 @@
 import type { Lexicon } from '../core/types.ts'
-import { activeIndex, findCompound, optionsFor, surfaceOf, type Answer, type SessionState } from '../core/session.ts'
+import { activeIndex, findCompound, isRelative, optionsFor, surfaceOf, tagged, type Answer, type SessionState } from '../core/session.ts'
+import type { LookupMode } from '../core/headword.ts'
+import { STEM_NAME, STEM_TYPES } from '../core/stems.ts'
 import type { UiPos } from '../core/checks.ts'
 import { ChoiceStep } from './steps/ChoiceStep.tsx'
 import { EndingSelector } from './steps/EndingSelector.tsx'
-import { NomFormPicker, VerbFormPicker } from './steps/FormPicker.tsx'
+import { NomFormPicker, NumGenPicker, VerbFormPicker } from './steps/FormPicker.tsx'
 import { IdentifyStep } from './steps/IdentifyStep.tsx'
 import { RoleStep } from './steps/RoleStep.tsx'
-import { POS_NAME } from './summary.ts'
+import { StemSelector } from './steps/StemSelector.tsx'
+import { describeAnswer, POS_NAME, segments, STEP_NAME } from './summary.ts'
 
-interface Props { st: SessionState; lex: Lexicon; onAnswer: (a: Answer) => void; onNext?: () => void }
+interface Props {
+  st: SessionState
+  lex: Lexicon
+  onAnswer: (a: Answer) => void
+  onNext?: () => void
+  mode?: LookupMode
+  /** A word opened for review: its answers are listed and any one can be changed. */
+  reviewing?: number | null
+  onEdit?: (logIndex: number) => void
+  onCloseReview?: () => void
+  onCancelEdit?: () => void
+}
+
+const CASE_OPTIONS = [
+  { value: 'nom', label: 'Nominative' }, { value: 'gen', label: 'Genitive' }, { value: 'dat', label: 'Dative' },
+  { value: 'acc', label: 'Accusative' }, { value: 'abl', label: 'Ablative' }, { value: 'voc', label: 'Vocative' },
+] as const
+const STEM_OPTIONS = STEM_TYPES.map((t) => ({ value: t, label: STEM_NAME[t][0].toUpperCase() + STEM_NAME[t].slice(1) }))
+
+function Review({ st, lex, i, onEdit, onClose }: { st: SessionState; lex: Lexicon; i: number; onEdit?: (k: number) => void; onClose?: () => void }) {
+  const rows = tagged(st).map((t, k) => ({ ...t, k })).filter((t) => t.word === i)
+  return (
+    <section className="workbench review" aria-live="polite">
+      <h3>Your answers for “{surfaceOf(st.tokens[i])}”</h3>
+      {rows.length === 0 && <p className="muted">No answers yet for this word.</p>}
+      <ul className="answers">
+        {rows.map((r) => (
+          <li key={r.k}>
+            <span className="step-name">{STEP_NAME[r.step]}</span>
+            <span className="step-answer">{describeAnswer(r.a, st, lex)}</span>
+            {onEdit && <button type="button" onClick={() => onEdit(r.k)}>Change</button>}
+          </li>
+        ))}
+      </ul>
+      <p className="hint">Changing an answer keeps everything after it that still fits. Anything it breaks is marked, and you answer just that part again.</p>
+      <div className="actions">
+        <button type="button" className="primary" onClick={onClose}>Back to the current question</button>
+      </div>
+    </section>
+  )
+}
+
+function EditNotice({ st, onCancel }: { st: SessionState; onCancel?: () => void }) {
+  const ed = st.editing
+  if (!ed) return null
+  const changed = surfaceOf(st.tokens[ed.word])
+  if (ed.pristine) {
+    return (
+      <div className="notice">
+        Changing your answer for <strong>{changed}</strong>. The rest of the sentence is kept and checked again after you answer.
+        {onCancel && <button type="button" className="link" onClick={onCancel}>Keep my old answer</button>}
+      </div>
+    )
+  }
+  const b = ed.broken
+  if (b && b.word !== ed.word) {
+    return (
+      <div className="notice broken" role="alert">
+        <strong>Chain broken.</strong> Your change to <strong>{changed}</strong> affects <strong>{surfaceOf(st.tokens[b.word])}</strong>
+        {b.reason ? <>: {b.reason}</> : <>, which needs a new answer here.</>}
+      </div>
+    )
+  }
+  if (b?.reason) return <div className="notice broken" role="alert">Your earlier answer here no longer fits: {b.reason}</div>
+  return <div className="notice">Still carrying your change to <strong>{changed}</strong> through the sentence.</div>
+}
 
 const POS_OPTIONS = (Object.keys(POS_NAME) as UiPos[]).map((p) => ({ value: p, label: POS_NAME[p] }))
 
-export function Workbench({ st, lex, onAnswer, onNext }: Props) {
+export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing = null, onEdit, onCloseReview, onCancelEdit }: Props) {
+  if (reviewing !== null) return <Review st={st} lex={lex} i={reviewing} onEdit={onEdit} onClose={onCloseReview} />
   const i = activeIndex(st)
   const tok = st.tokens[i]
   const w = st.words[i]
@@ -29,7 +98,7 @@ export function Workbench({ st, lex, onAnswer, onNext }: Props) {
   switch (st.step) {
     case 'identify':
       title = `What word is “${surface}”?`
-      body = <IdentifyStep key={i} lex={lex} onPick={(entryId) => onAnswer({ step: 'identify', entryId })} />
+      body = <IdentifyStep key={`${i}-${mode}`} lex={lex} mode={mode} onPick={(entryId) => onAnswer({ step: 'identify', entryId })} />
       break
     case 'pos':
       title = 'What part of speech is it?'
@@ -44,6 +113,11 @@ export function Workbench({ st, lex, onAnswer, onNext }: Props) {
       body = <NomFormPicker options={options} onSubmit={(form) => onAnswer({ step: 'nomForm', form })} />
       break
     case 'nomRole': {
+      if (isRelative(w)) {
+        title = 'What is its function in its own clause?'
+        body = <RoleStep kind="noun" options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
+        break
+      }
       const kind = w.pos === 'N' ? 'noun' : w.pos === 'ADV' ? 'adverb' : w.pos === 'PRO' ? 'pronoun' : 'adjective'
       title = kind === 'noun' ? 'What is its function?' : kind === 'adverb' ? 'Label it.' : 'What does it do in the sentence?'
       body = <RoleStep kind={kind} participle={isPtc} options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
@@ -53,9 +127,34 @@ export function Workbench({ st, lex, onAnswer, onNext }: Props) {
       title = 'Mark the personal ending.'
       body = <EndingSelector word={surface} onSubmit={(e) => onAnswer({ step: 'personal', ending: e ?? '' })} />
       break
-    case 'marker':
-      title = 'Mark the tense/mood marker, or choose None.'
-      body = <EndingSelector word={surface} offset={[...(w.personal ?? '')].length} allowNone onSubmit={(marker) => onAnswer({ step: 'marker', marker })} />
+    case 'stem': {
+      title = 'Mark the stem.'
+      const endLen = [...(w.path === 'finite' ? w.personal ?? '' : w.ending ?? '')].length
+      body = <StemSelector word={surface} endLen={endLen} onSubmit={(stem) => onAnswer({ step: 'stem', stem })} />
+      break
+    }
+    case 'stemType':
+      title = `Which stem is “${w.stem}-”?`
+      body = <ChoiceStep options={STEM_OPTIONS} onPick={(t) => onAnswer({ step: 'stemType', t })} />
+      break
+    case 'relNG':
+      title = 'Number and gender? (They match the antecedent.)'
+      body = <NumGenPicker options={options} onSubmit={(n, g) => onAnswer({ step: 'relNG', n, g })} />
+      break
+    case 'antecedent':
+      title = 'Which word is its antecedent?'
+      body = (
+        <div className="choices">
+          {(options.nounTargets ?? []).map((t) => (
+            <button key={t} type="button" onClick={() => onAnswer({ step: 'antecedent', target: t })}><em>{wordAt(t)}</em></button>
+          ))}
+          <button type="button" onClick={() => onAnswer({ step: 'antecedent', target: null })}>No antecedent stated</button>
+        </div>
+      )
+      break
+    case 'relCase':
+      title = 'What case is it in its own clause?'
+      body = <ChoiceStep options={[...CASE_OPTIONS]} onPick={(c) => onAnswer({ step: 'relCase', c })} />
       break
     case 'infEnding':
       title = 'Mark the ending.'
@@ -132,6 +231,8 @@ export function Workbench({ st, lex, onAnswer, onNext }: Props) {
           <span className="def">{entry.definition}</span>
         </div>
       )}
+      <EditNotice st={st} onCancel={onCancelEdit} />
+      {w && segments(st, i) && st.step !== 'done' && <p className="segments">{segments(st, i)}</p>}
       <h3>{title}</h3>
       <div key={`${i}-${st.step}-${st.log.length}`}>{body}</div>
       {st.error && <p className="error" role="alert">{st.error}</p>}

@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchDataset } from '../core/loadDataset.browser.ts'
 import { buildLexicon, withGlosses } from '../core/lexicon.ts'
 import type { SentenceSet, SetIndexItem } from '../core/sets.ts'
-import { replay, submit, type Answer, type SessionState } from '../core/session.ts'
+import { cancelEdit, replay, startEdit, submit, type Answer, type SessionState } from '../core/session.ts'
+import type { LookupMode } from '../core/headword.ts'
 import type { Lexicon } from '../core/types.ts'
-import { clearLog, doneSet, loadLog, markDone, saveLog } from './progress.ts'
+import { clearLog, doneSet, loadMode, loadProgress, markDone, saveLog, saveMode } from './progress.ts'
 import { SentenceView } from './SentenceView.tsx'
 import { Workbench } from './Workbench.tsx'
 import './styles.css'
@@ -26,6 +27,8 @@ export default function App() {
   const [sentence, setSentence] = useState<number | null>(null)
   const [st, setSt] = useState<SessionState | null>(null)
   const [done, setDone] = useState<Set<number>>(new Set())
+  const [mode, setMode] = useState<LookupMode>(loadMode)
+  const [reviewing, setReviewing] = useState<number | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -62,23 +65,45 @@ export default function App() {
   useEffect(() => {
     if (!set || sentence === null || !lex) { setSt(null); return }
     const tokens = set.sentences[sentence].tokens
-    setSt(replay(tokens, loadLog(set.id, sentence), lex))
+    const saved = loadProgress(set.id, sentence)
+    const base = replay(tokens, saved.log, lex)
+    setSt(saved.editing && base.log.length === saved.log.length ? { ...base, editing: saved.editing } : base)
+    setReviewing(null)
     writeLast({ setId: set.id, i: sentence })
   }, [set, sentence, lex])
 
-  const onAnswer = (a: Answer) => {
-    if (!st || !lex || !set || sentence === null) return
-    const next = submit(st, a, lex)
+  const commit = (next: SessionState) => {
+    if (!set || sentence === null) return
     setSt(next)
-    if (!next.error) {
-      saveLog(set.id, sentence, next.log)
-      if (next.step === 'done') { markDone(set.id, sentence); setDone(doneSet(set.id)) }
-    }
+    if (next.error) return
+    saveLog(set.id, sentence, next.log, next.editing)
+    if (next.step === 'done') { markDone(set.id, sentence); setDone(doneSet(set.id)) }
   }
+
+  const onAnswer = (a: Answer) => {
+    if (!st || !lex) return
+    commit(submit(st, a, lex))
+  }
+
+  const onEdit = (k: number) => {
+    if (!st || !lex) return
+    setReviewing(null)
+    commit(startEdit(st, k, lex))
+  }
+
+  const onCancelEdit = () => {
+    if (!st || !lex) return
+    commit(cancelEdit(st, lex))
+  }
+
+  const changeMode = (m: LookupMode) => { setMode(m); saveMode(m) }
+
+  const reviewable = useMemo(() => new Set(st?.trace.map((t) => t.word) ?? []), [st])
 
   const restart = () => {
     if (!set || sentence === null || !lex) return
     clearLog(set.id, sentence)
+    setReviewing(null)
     setSt(replay(set.sentences[sentence].tokens, [], lex))
   }
 
@@ -89,6 +114,17 @@ export default function App() {
     <main className="app">
       <header className="top">
         <h1>PROCESS</h1>
+        <div className="mode-picker" role="radiogroup" aria-label="Dictionary lookup">
+          <span>Dictionary lookup</span>
+          <div className="seg">
+            {(['help', 'normal', 'real'] as const).map((m) => (
+              <button key={m} type="button" role="radio" aria-checked={mode === m} className={mode === m ? 'on' : ''} onClick={() => changeMode(m)}
+                title={m === 'help' ? 'Search as you type' : m === 'normal' ? 'Type at least the first part of the entry' : 'Type the whole dictionary entry'}>
+                {m === 'help' ? 'Help' : m === 'normal' ? 'Normal' : 'Real'}
+              </button>
+            ))}
+          </div>
+        </div>
         <label className="set-picker">
           <span>Sentence set</span>
           <select
@@ -116,10 +152,16 @@ export default function App() {
 
       {st && set && sentence !== null && (
         <>
-          <SentenceView st={st} />
+          <SentenceView st={st} reviewable={reviewable} reviewing={reviewing} onPickWord={(i) => setReviewing(reviewing === i ? null : i)} />
+          {reviewable.size > 0 && <p className="sentence-hint">Click a word to see or change your answers.</p>}
           <Workbench
             st={st}
             lex={lex}
+            mode={mode}
+            reviewing={reviewing}
+            onEdit={onEdit}
+            onCloseReview={() => setReviewing(null)}
+            onCancelEdit={onCancelEdit}
             onAnswer={onAnswer}
             onNext={sentence < set.sentences.length - 1 ? () => setSentence(sentence + 1) : undefined}
           />

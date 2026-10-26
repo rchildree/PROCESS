@@ -65,3 +65,16 @@ export function VerbFormPicker({ options, kinds, onSubmit }: { options: Options;
     </div>
   )
 }
+
+/** Relative pronouns: number and gender only (they match the antecedent); case comes later. */
+export function NumGenPicker({ options, onSubmit }: { options: Options; onSubmit: (n: NomForm['n'], g: NomForm['g']) => void }) {
+  const [n, setN] = useState<NomForm['n']>()
+  const [g, setG] = useState<NomForm['g']>()
+  return (
+    <div className="form-picker">
+      <Group title="Number" values={options.numbers ?? []} labels={NUM_LABEL} value={n} onChange={setN} />
+      <Group title="Gender" values={options.genders ?? []} labels={GEN_LABEL} value={g} onChange={setG} />
+      <button type="button" className="primary" disabled={!n || !g} onClick={() => n && g && onSubmit(n, g)}>Check</button>
+    </div>
+  )
+}

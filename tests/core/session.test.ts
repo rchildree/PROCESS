@@ -3,6 +3,7 @@ import { lex } from '../helpers/lex.ts'
 import { tokenize } from '../../src/core/sets.ts'
 import { replay, startSession, submit, type Answer, type SessionState } from '../../src/core/session.ts'
 import type { NomForm, VerbForm } from '../../src/core/checks.ts'
+import type { StemType } from '../../src/core/stems.ts'
 
 const known = (w: string) => lex().lookup(w).length > 0
 const toks = (s: string) => tokenize(s, known)
@@ -26,8 +27,8 @@ const noun = (id: string, ending: string, form: NomForm, label: any): Answer[] =
 const adjStart = (id: string, ending: string, form: NomForm, pos: any = 'ADJ'): Answer[] => [
   { step: 'identify', entryId: id }, { step: 'pos', pos }, { step: 'ending', ending }, { step: 'nomForm', form },
 ]
-const verb = (id: string, personal: string, marker: string | null, form: VerbForm): Answer[] => [
-  { step: 'identify', entryId: id }, { step: 'pos', pos: 'V' }, { step: 'personal', ending: personal }, { step: 'marker', marker },
+const verb = (id: string, personal: string, stem: string, t: StemType, form: VerbForm): Answer[] => [
+  { step: 'identify', entryId: id }, { step: 'pos', pos: 'V' }, { step: 'personal', ending: personal }, { step: 'stem', stem }, { step: 'stemType', t },
   { step: 'verbForm', form },
 ]
 
@@ -39,7 +40,7 @@ const L10_2_ANSWERS: Answer[] = [
   ...adjStart('magnus-adj', 'ā', nf('abl', 'sg', 'f')), { step: 'nomRole', role: { kind: 'pendingNoun' } },
   { step: 'identify', entryId: 'cum-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
   ...noun('cura-n', 'ā', nf('abl', 'sg', 'f'), 'PP'), { step: 'linkPending', target: 3 },
-  ...verb('curo-v', 'it', null, fin('pf', 'act', '3', 'sg')), { step: 'verbRole', role: { kind: 'label', label: 'V' } },
+  ...verb('curo-v', 'it', 'cūrāv', 'pfAct', fin('pf', 'act', '3', 'sg')), { step: 'verbRole', role: { kind: 'label', label: 'V' } },
 ]
 
 describe('full sentences', () => {
@@ -60,8 +61,9 @@ describe('full sentences', () => {
       ...noun('caesar-n', 'e', nf('abl', 'sg', 'm'), 'PP'),
       { step: 'identify', entryId: 'in-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
       ...noun('ager-n', 'ō', nf('abl', 'sg', 'm'), 'PP'),
-      ...adjStart('instruo-v', 'a', nf('nom', 'sg', 'f'), 'V'), { step: 'nomRole', role: { kind: 'verbPart' } },
-      ...verb('sum-v', 't', null, fin('pres', 'act', '3', 'sg')), { step: 'verbRole', role: { kind: 'aux', target: 7 } },
+      { step: 'identify', entryId: 'instruo-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'a' },
+      { step: 'stem', stem: 'īnstrūct' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: nf('nom', 'sg', 'f') }, { step: 'nomRole', role: { kind: 'verbPart' } },
+      ...verb('sum-v', 't', 'es', 'pres', fin('pres', 'act', '3', 'sg')), { step: 'verbRole', role: { kind: 'aux', target: 7 } },
       { step: 'compoundForm', form: fin('pf', 'pass', '3', 'sg') },
       { step: 'compoundRole', role: { kind: 'label', label: 'PV' } },
     ])
@@ -89,7 +91,7 @@ describe('checks inside the flow', () => {
     ])
     expect(st.step).toBe('clauseBoundary')
     expect(submit(st, { step: 'clauseBoundary', ends: true }, lex()).error).toMatch(/verb/)
-    st = play('', [{ step: 'clauseBoundary', ends: false }, ...verb('dormio-v', 'nt', null, fin('pres', 'act', '3', 'pl')),
+    st = play('', [{ step: 'clauseBoundary', ends: false }, ...verb('dormio-v', 'nt', 'dormi', 'pres', fin('pres', 'act', '3', 'pl')),
       { step: 'verbRole', role: { kind: 'label', label: 'V' } }, { step: 'clauseBoundary', ends: true }], st)
     expect(st.words[0].clauseDepth).toBe(1)
     expect(st.words[2].clauseDepth).toBe(1)
@@ -101,7 +103,7 @@ describe('checks inside the flow', () => {
   test('pending must resolve', () => {
     let st = play('puer fugit magnus', [
       ...noun('puer-n', '', nf('nom', 'sg', 'm'), 'S'),
-      ...verb('fugio-v', 't', null, fin('pres', 'act', '3', 'sg')), { step: 'verbRole', role: { kind: 'label', label: 'V' } },
+      ...verb('fugio-v', 't', 'fug', 'pres', fin('pres', 'act', '3', 'sg')), { step: 'verbRole', role: { kind: 'label', label: 'V' } },
       ...adjStart('magnus-adj', 'us', nf('nom', 'sg', 'm')), { step: 'nomRole', role: { kind: 'pendingNoun' } },
     ])
     expect(st.step).toBe('resolvePending')
