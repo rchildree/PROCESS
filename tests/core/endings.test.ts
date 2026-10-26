@@ -80,3 +80,13 @@ describe('infinitives', () => {
     expect(checkInfinitiveEnding(lex(), 'amo-v', 'amāre', 'e').ok).toBe(false)
   })
 })
+
+import { checkPersonalEnding } from '../../src/core/endings.ts'
+describe('personal ending alone', () => {
+  test('accepts a personal ending before the marker is chosen', () => {
+    expect(checkPersonalEnding(lex(), 'amo-v', 'amābat', 't').ok).toBe(true)
+    expect(checkPersonalEnding(lex(), 'amo-v', 'amāvit', 'it').ok).toBe(true)
+    expect(checkPersonalEnding(lex(), 'amo-v', 'amāvit', 't').ok).toBe(false)
+    expect(checkPersonalEnding(lex(), 'amo-v', 'amat', 'at').ok).toBe(false)
+  })
+})

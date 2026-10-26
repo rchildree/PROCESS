@@ -72,6 +72,21 @@ export function checkNominalEnding(lex: Lexicon, entryId: string, surface: strin
   return no(e ? `“-${ending}” is not an ending this word can have.` : 'This form has a visible ending — mark it.')
 }
 
+/** The personal-ending step on its own: is there any reading of this form with that personal ending? */
+export function checkPersonalEnding(lex: Lexicon, entryId: string, surface: string, personal: string): Check {
+  const s = strip(surface)
+  const pe = strip(personal)
+  if (!s.endsWith(pe)) return no('That is not the end of this word.')
+  if (s.length - pe.length < 1) return no('Leave the stem — the ending cannot be the whole word.')
+  for (const a of analysesFor(lex, entryId, surface)) {
+    if (a.k === 'imp' && PERSONAL_IMP[a.n ?? 'sg'].includes(pe)) return yes
+    if (a.k !== 'fin') continue
+    const table = a.t === 'pf' && a.m === 'ind' && a.v === 'act' ? PERSONAL_PERF : a.v === 'pass' ? PERSONAL_PASS : PERSONAL_ACT
+    if ((table[`${a.p}${a.n}`] ?? []).includes(pe)) return yes
+  }
+  return no(`“-${personal}” is not a personal ending this form can have.`)
+}
+
 export function checkVerbSegments(lex: Lexicon, entryId: string, surface: string, personal: string, marker: string | null): Check {
   const entry = lex.entries.get(entryId)
   const s = strip(surface)
