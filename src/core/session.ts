@@ -12,13 +12,12 @@ import type { Case, Check, Gender, Lexicon, Mood, Num, Person, Tense, Voice } fr
 export type StepId =
   | 'identify' | 'pos' | 'ending' | 'nomForm' | 'nomRole' | 'personal' | 'stem' | 'stemType' | 'infEnding' | 'verbForm' | 'verbRole'
   | 'relNG' | 'antecedent' | 'relCase'
-  | 'compoundForm' | 'compoundRole' | 'prepCase' | 'conjType' | 'linkPending' | 'clauseBoundary' | 'encliticPos'
-  | 'encliticConj' | 'resolvePending' | 'done'
+  | 'compoundForm' | 'compoundRole' | 'prepCase' | 'conjType' | 'clauseBoundary' | 'encliticPos'
+  | 'encliticConj' | 'done'
 
 export type Role =
   | { kind: 'label'; label: Label }
   | { kind: 'modifies'; target: number }
-  | { kind: 'pendingNoun' }
   | { kind: 'predicate'; label: 'SC' | 'OC' }
   | { kind: 'substantive'; label: Label }
   | { kind: 'verbPart'; target?: number }
@@ -35,8 +34,7 @@ export type Answer =
   | { step: 'relCase'; c: Case }
   | { step: 'nomForm'; form: NomForm }
   | { step: 'verbForm' | 'compoundForm'; form: VerbForm }
-  | { step: 'nomRole' | 'verbRole' | 'compoundRole' | 'resolvePending'; role: Role }
-  | { step: 'linkPending'; target: number | null }
+  | { step: 'nomRole' | 'verbRole' | 'compoundRole'; role: Role }
   | { step: 'prepCase'; c: Case }
   | { step: 'conjType' | 'encliticConj'; t: '+' | '↓' }
   | { step: 'encliticPos'; pos: UiPos }
@@ -79,8 +77,6 @@ export interface SessionState {
   /** The prepositional phrase that just closed, so a following + can extend it (ex agrō et aquā). */
   lastPP: { prep: number; c: Case; closer: number } | null
   clauses: { conj: number; hasFiniteVerb: boolean }[]
-  pendingLinkCandidates: number[]
-  resolving: number | null
   error: string | null
   log: Answer[]
   /** Which word and step each logged answer belongs to. */
@@ -109,6 +105,8 @@ export interface Editing {
 export interface Options {
   cases?: Case[]; numbers?: Num[]; genders?: Gender[]; persons?: Person[]; tenses?: Tense[]; moods?: Mood[]; voices?: Voice[]
   labels?: Label[]; nounTargets?: number[]; pendingTargets?: number[]; pos?: UiPos[]
+  /** Every word after the current one, for links to a word not reached yet. */
+  later?: number[]
 }
 
 export const ALL_CASES: Case[] = ['nom', 'gen', 'dat', 'acc', 'abl', 'voc']
@@ -125,7 +123,7 @@ export const ALL_POS: UiPos[] = ['N', 'ADJ', 'PRO', 'V', 'ADV', 'PREP', 'CONJ', 
 export const surfaceOf = (t: Token) => t.host ?? t.surface
 
 export function activeIndex(st: SessionState): number {
-  return st.resolving ?? st.current
+  return st.current
 }
 
 const isGloss = (id?: string) => !!id && id.startsWith('gloss:')
@@ -142,12 +140,37 @@ export function isNounLike(w: WordState): boolean {
   return w.role.kind === 'label' && (w.pos === 'N' || w.pos === 'PRO')
 }
 
-function isUnresolved(w: WordState): boolean {
-  const r = w.role
-  if (!r) return false
-  if (r.kind === 'pendingNoun') return true
-  if ((r.kind === 'verbPart' || r.kind === 'aux') && r.target === undefined) return true
-  return false
+export interface IncomingLink { from: number; kind: 'noun' | 'sum' | 'ptc' }
+
+/** Earlier words that point forward to word j: an adjective to its noun, a participle to its sum, a sum to its participle. */
+export function incomingLinks(st: SessionState, j: number): IncomingLink[] {
+  const out: IncomingLink[] = []
+  st.words.forEach((x, from) => {
+    const r = x.role
+    if (from >= j || !r || !('target' in r) || r.target !== j) return
+    if (r.kind === 'modifies') out.push({ from, kind: 'noun' })
+    if (r.kind === 'verbPart') out.push({ from, kind: 'sum' })
+    if (r.kind === 'aux') out.push({ from, kind: 'ptc' })
+  })
+  return out
+}
+
+const quoted = (st: SessionState, j: number) => `“${surfaceOf(st.tokens[j])}”`
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
+
+/** An earlier adjective linked to this word: it must be used as a noun and agree. */
+function checkIncomingNoun(st: SessionState, i: number): string | null {
+  const w = st.words[i]
+  for (const l of incomingLinks(st, i)) {
+    if (l.kind !== 'noun') continue
+    if (!isNounLike(w)) return `${quoted(st, l.from)} was linked to this word as its noun, but it is not used as a noun here.`
+    const f = st.words[l.from].nomForm
+    if (f && w.nomForm) {
+      const c = checkAgreement(f, w.nomForm)
+      if (!c.ok) return `${quoted(st, l.from)} goes with this word, but ${lowerFirst(c.reason)}`
+    }
+  }
+  return null
 }
 
 function withWord(st: SessionState, i: number, patch: Partial<WordState>): SessionState {
@@ -169,8 +192,6 @@ export function startSession(tokens: Token[]): SessionState {
     openPP: null,
     lastPP: null,
     clauses: [],
-    pendingLinkCandidates: [],
-    resolving: null,
     error: null,
     log: [],
     trace: [],
@@ -190,6 +211,8 @@ function finishWord(st: SessionState): SessionState {
   const i = st.current
   const tok = st.tokens[i]
   const w = st.words[i]
+  const linkErr = checkIncomingNoun(st, i)
+  if (linkErr) return fail(st, linkErr)
   if (tok.enclitic && !w.enclitic?.done) {
     return { ...withWord(st, i, { enclitic: { done: false } }), step: 'encliticPos' }
   }
@@ -207,26 +230,7 @@ function advance(st: SessionState): SessionState {
     const next = st.current + 1
     return { ...withWord(st, next, { clauseDepth: st.clauses.length }), current: next, step: 'identify' }
   }
-  return nextUnresolved({ ...st, resolving: null })
-}
-
-function nextUnresolved(st: SessionState): SessionState {
-  const i = st.words.findIndex(isUnresolved)
-  if (i < 0) return { ...st, resolving: null, step: 'done' }
-  return { ...st, resolving: i, step: 'resolvePending' }
-}
-
-/** After a noun-like word is labeled: offer pending adjectives that agree with it. */
-function afterNounLike(st: SessionState): SessionState {
-  const i = st.current
-  const w = st.words[i]
-  if (!isNounLike(w)) return finishWord(st)
-  const cands = st.words
-    .map((x, j) => ({ x, j }))
-    .filter(({ x, j }) => j < i && x.role?.kind === 'pendingNoun' && (!x.nomForm || !w.nomForm || checkAgreement(x.nomForm, w.nomForm).ok))
-    .map(({ j }) => j)
-  if (!cands.length) return finishWord(st)
-  return { ...st, pendingLinkCandidates: cands, step: 'linkPending' }
+  return { ...st, step: 'done' }
 }
 
 function closePPIfObject(st: SessionState, i: number): SessionState {
@@ -238,10 +242,10 @@ function closePPIfObject(st: SessionState, i: number): SessionState {
 
 // ---------- role checks ----------
 
-function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon, resolving: boolean): Check {
+function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon): Check {
   const w = st.words[i]
   const form = w.nomForm
-  const openPP = resolving ? null : st.openPP ? { case: st.openPP.c, soft: st.openPP.soft } : null
+  const openPP = st.openPP ? { case: st.openPP.c, soft: st.openPP.soft } : null
   const gloss = isGloss(w.entryId) || (w.path === 'none' && !form)
   const no = (reason: string): Check => ({ ok: false, reason })
 
@@ -267,16 +271,17 @@ function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon,
       if (w.pos === 'N') return no('A noun does not modify another noun here.')
       const t = st.words[role.target]
       if (!t || role.target === i) return no('Choose a noun in the sentence.')
-      if (!resolving && role.target > i) return no('That word has not been reached yet.')
+      if (role.target > i) {
+        // Not parsed yet: some reading of it must be able to agree.
+        const cands = lex.lookup(surfaceOf(st.tokens[role.target]))
+        if (!form || !cands.length) return { ok: true }
+        const can = cands.some((c) => c.analyses.some((a) => a.c === form.c && a.n === form.n && a.g === form.g))
+        return can ? { ok: true } : no('That word cannot agree with this adjective.')
+      }
       if (!isNounLike(t)) return no('That word is not being used as a noun.')
       return form && t.nomForm ? checkAgreement(form, t.nomForm) : { ok: true }
     }
-    case 'pendingNoun':
-      if (resolving) return no('The sentence is finished — decide now.')
-      if (w.pos === 'N') return no('A noun does not wait for another noun.')
-      return { ok: true }
     case 'verbPart': {
-      if (resolving) return no('There is no form of sum left for this participle — decide what else it does.')
       const ptc = w.entryId ? analysesFor(lex, w.entryId, surfaceOf(st.tokens[i])).some((a) => a.k === 'ptc') : false
       if (!ptc) return no('Only a participle can be part of a verb.')
       if (role.target !== undefined) {
@@ -290,7 +295,7 @@ function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon,
   }
 }
 
-function checkVerbRole(st: SessionState, i: number, role: Role, lex: Lexicon, resolving: boolean): Check {
+function checkVerbRole(st: SessionState, i: number, role: Role, lex: Lexicon): Check {
   const w = st.words[i]
   const no = (reason: string): Check => ({ ok: false, reason })
   if (role.kind === 'label') {
@@ -299,7 +304,6 @@ function checkVerbRole(st: SessionState, i: number, role: Role, lex: Lexicon, re
   }
   if (role.kind === 'aux') {
     if (w.entryId !== 'sum-v') return no('Only a form of sum can be an auxiliary.')
-    if (resolving) return no('There is no participle left for this verb — label it.')
     if (role.target !== undefined) {
       const t = st.words[role.target]
       if (!t || role.target >= i || t.role?.kind !== 'verbPart' || t.role.target !== undefined) return no('Choose a participle that is waiting for its auxiliary.')
@@ -362,7 +366,7 @@ function drain(st: SessionState, lex: Lexicon): SessionState {
     if (st.step === 'done') return { ...st, editing: null }
     const cur = st
     // Answers for words already passed can no longer apply (except end-of-sentence decisions).
-    q = q.filter((t) => (cur.resolving !== null ? t.step === 'resolvePending' : t.step === 'resolvePending' || t.word >= cur.current))
+    q = q.filter((t) => t.word >= cur.current)
     if (!q.length) return { ...st, editing: null }
     const w = activeIndex(st)
     const idx = q.findIndex((t) => t.word === w && t.step === st.step)
@@ -388,6 +392,8 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
     }
 
     case 'pos': {
+      const asNoun = incomingLinks(st, i).find((l) => l.kind === 'noun')
+      if (asNoun && !['N', 'ADJ', 'PRO'].includes(a.pos)) return fail(st, `${quoted(st, asNoun.from)} was linked to this word as its noun.`)
       if (!isGloss(w.entryId)) {
         const c = checkPos(lex, surface, w.entryId!, a.pos)
         if (!c.ok) return fail(st, c.reason)
@@ -484,7 +490,7 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
     }
 
     case 'nomRole': {
-      const c = checkNominalRole(st, i, a.role, lex, false)
+      const c = checkNominalRole(st, i, a.role, lex)
       if (!c.ok) return fail(st, c.reason)
       st = withWord(st, i, { role: a.role })
       if (a.role.kind === 'verbPart' && a.role.target !== undefined) {
@@ -497,16 +503,7 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
         const clauses = [...st.clauses, { conj: i, hasFiniteVerb: false }]
         st = withWord({ ...st, clauses }, i, { clauseDepth: clauses.length })
       }
-      return afterNounLike(st)
-    }
-
-    case 'linkPending': {
-      if (a.target === null) return finishWord({ ...st, pendingLinkCandidates: [] })
-      if (!st.pendingLinkCandidates.includes(a.target)) return fail(st, 'That word is not waiting for this noun.')
-      st = withWord(st, a.target, { role: { kind: 'modifies', target: i } })
-      const rest = st.pendingLinkCandidates.filter((j) => j !== a.target)
-      if (rest.length) return { ...st, pendingLinkCandidates: rest }
-      return finishWord({ ...st, pendingLinkCandidates: [] })
+      return finishWord(st)
     }
 
     case 'personal': {
@@ -532,7 +529,7 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
     }
 
     case 'verbRole': {
-      const c = checkVerbRole(st, i, a.role, lex, false)
+      const c = checkVerbRole(st, i, a.role, lex)
       if (!c.ok) return fail(st, c.reason)
       st = withWord(st, i, { role: a.role })
       if (a.role.kind === 'aux') {
@@ -621,17 +618,6 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       if (last) return fail(st, 'The sentence ends here, so the clause must end too.')
       return advance(st)
     }
-
-    case 'resolvePending': {
-      const r = st.resolving
-      if (r === null) return fail(st, 'Nothing to resolve.')
-      const rw = st.words[r]
-      const isVerb = rw.role?.kind === 'aux'
-      const c = isVerb ? checkVerbRole(st, r, a.role, lex, true) : checkNominalRole(st, r, a.role, lex, true)
-      if (!c.ok) return fail(st, c.reason)
-      st = withWord(st, r, { role: a.role })
-      return nextUnresolved(st)
-    }
   }
 }
 
@@ -652,7 +638,8 @@ export function findCompound(st: SessionState, i: number): Compound | undefined 
 export function optionsFor(st: SessionState, lex: Lexicon): Options {
   const i = activeIndex(st)
   const w = st.words[i]
-  const nounTargets = st.words.map((x, j) => ({ x, j })).filter(({ x, j }) => j !== i && isNounLike(x) && (st.step === 'resolvePending' || j < i)).map(({ j }) => j)
+  const nounTargets = st.words.map((x, j) => ({ x, j })).filter(({ x, j }) => j < i && isNounLike(x)).map(({ j }) => j)
+  const later = st.tokens.map((_, j) => j).filter((j) => j > i)
   switch (st.step) {
     case 'pos': case 'encliticPos': return { pos: ALL_POS }
     case 'nomForm': return { cases: ALL_CASES, numbers: ALL_NUMBERS, genders: ALL_GENDERS }
@@ -664,14 +651,12 @@ export function optionsFor(st: SessionState, lex: Lexicon): Options {
     case 'nomRole': {
       const pendingTargets = st.words.map((x, j) => ({ x, j })).filter(({ x, j }) => j < i && x.role?.kind === 'aux' && x.role.target === undefined).map(({ j }) => j)
       const ptc = w.entryId && !isGloss(w.entryId) ? analysesFor(lex, w.entryId, surfaceOf(st.tokens[i])).some((a) => a.k === 'ptc') : false
-      return { labels: w.pos === 'ADV' ? ['ADV'] : NOUN_LABELS, nounTargets, pendingTargets: ptc ? pendingTargets : [] }
+      return { labels: w.pos === 'ADV' ? ['ADV'] : NOUN_LABELS, nounTargets, later, pendingTargets: ptc ? pendingTargets : [] }
     }
     case 'verbRole': case 'compoundRole': {
       const pendingTargets = st.words.map((x, j) => ({ x, j })).filter(({ x, j }) => j < i && x.role?.kind === 'verbPart' && x.role.target === undefined).map(({ j }) => j)
       return { labels: VERB_LABELS, pendingTargets: st.step === 'verbRole' && w.entryId === 'sum-v' ? pendingTargets : [] }
     }
-    case 'linkPending': return { pendingTargets: st.pendingLinkCandidates }
-    case 'resolvePending': return { labels: w.role?.kind === 'aux' ? VERB_LABELS : NOUN_LABELS, nounTargets }
     default: return {}
   }
 }

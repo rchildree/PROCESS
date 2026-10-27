@@ -35,11 +35,11 @@ const verb = (id: string, personal: string, stem: string, t: StemType, form: Ver
 const L10_2 = 'medicus timidum puerum magnā cum cūrā cūrāvit.'
 const L10_2_ANSWERS: Answer[] = [
   ...noun('medicus-n', 'us', nf('nom', 'sg', 'm'), 'S'),
-  ...adjStart('timidus-adj', 'um', nf('acc', 'sg', 'm')), { step: 'nomRole', role: { kind: 'pendingNoun' } },
-  ...noun('puer-n', 'um', nf('acc', 'sg', 'm'), 'O'), { step: 'linkPending', target: 1 },
-  ...adjStart('magnus-adj', 'ā', nf('abl', 'sg', 'f')), { step: 'nomRole', role: { kind: 'pendingNoun' } },
+  ...adjStart('timidus-adj', 'um', nf('acc', 'sg', 'm')), { step: 'nomRole', role: { kind: 'modifies', target: 2 } },
+  ...noun('puer-n', 'um', nf('acc', 'sg', 'm'), 'O'),
+  ...adjStart('magnus-adj', 'ā', nf('abl', 'sg', 'f')), { step: 'nomRole', role: { kind: 'modifies', target: 5 } },
   { step: 'identify', entryId: 'cum-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
-  ...noun('cura-n', 'ā', nf('abl', 'sg', 'f'), 'PP'), { step: 'linkPending', target: 3 },
+  ...noun('cura-n', 'ā', nf('abl', 'sg', 'f'), 'PP'),
   ...verb('curo-v', 'it', 'cūrāv', 'pfAct', fin('pf', 'act', '3', 'sg')), { step: 'verbRole', role: { kind: 'label', label: 'V' } },
 ]
 
@@ -55,8 +55,8 @@ describe('full sentences', () => {
   test('L10 #8 unites a feminine perfect passive', () => {
     const st = play('aciēs eō tempore ā Caesare in agrō īnstrūcta est.', [
       ...noun('acies-n', 'ēs', nf('nom', 'sg', 'f'), 'S'),
-      ...adjStart('is-pron', 'ō', nf('abl', 'sg', 'n'), 'PRO'), { step: 'nomRole', role: { kind: 'pendingNoun' } },
-      ...noun('tempus-n', 'e', nf('abl', 'sg', 'n'), 'ADV'), { step: 'linkPending', target: 1 },
+      ...adjStart('is-pron', 'ō', nf('abl', 'sg', 'n'), 'PRO'), { step: 'nomRole', role: { kind: 'modifies', target: 2 } },
+      ...noun('tempus-n', 'e', nf('abl', 'sg', 'n'), 'ADV'),
       { step: 'identify', entryId: 'a-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
       ...noun('caesar-n', 'e', nf('abl', 'sg', 'm'), 'PP'),
       { step: 'identify', entryId: 'in-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
@@ -100,15 +100,35 @@ describe('checks inside the flow', () => {
     expect(st.step).toBe('identify')
   })
 
-  test('pending must resolve', () => {
-    let st = play('puer fugit magnus', [
+  test('forward link is checked when the noun finishes', () => {
+    const st = play('magnae puellae', [
+      ...adjStart('magnus-adj', 'ae', nf('nom', 'pl', 'f')), { step: 'nomRole', role: { kind: 'modifies', target: 1 } },
+      { step: 'identify', entryId: 'puella-n' }, { step: 'pos', pos: 'N' }, { step: 'ending', ending: 'ae' }, { step: 'nomForm', form: nf('dat', 'sg', 'f') },
+    ])
+    const err = submit(st, { step: 'nomRole', role: { kind: 'label', label: 'O' } }, lex()).error
+    expect(err).toMatch(/magnae/)
+    expect(err).toMatch(/case/)
+  })
+
+  test('forward link to a word that cannot agree is refused at once', () => {
+    const st = play('magnus puellās', adjStart('magnus-adj', 'us', nf('nom', 'sg', 'm')))
+    expect(submit(st, { step: 'nomRole', role: { kind: 'modifies', target: 1 } }, lex()).error).toMatch(/cannot agree/)
+  })
+
+  test('word linked as a noun must be N, ADJ or PRO', () => {
+    const st = play('magnus puer est', [
+      ...adjStart('magnus-adj', 'us', nf('nom', 'sg', 'm')), { step: 'nomRole', role: { kind: 'modifies', target: 1 } },
+      { step: 'identify', entryId: 'puer-n' },
+    ])
+    expect(submit(st, { step: 'pos', pos: 'V' }, lex()).error).toMatch(/magnus/)
+  })
+
+  test('nothing is left waiting at the end of the sentence', () => {
+    const st = play('puer fugit magnus', [
       ...noun('puer-n', '', nf('nom', 'sg', 'm'), 'S'),
       ...verb('fugio-v', 't', 'fug', 'pres', fin('pres', 'act', '3', 'sg')), { step: 'verbRole', role: { kind: 'label', label: 'V' } },
-      ...adjStart('magnus-adj', 'us', nf('nom', 'sg', 'm')), { step: 'nomRole', role: { kind: 'pendingNoun' } },
+      ...adjStart('magnus-adj', 'us', nf('nom', 'sg', 'm')), { step: 'nomRole', role: { kind: 'modifies', target: 0 } },
     ])
-    expect(st.step).toBe('resolvePending')
-    expect(submit(st, { step: 'resolvePending', role: { kind: 'pendingNoun' } }, lex()).error).toBeTruthy()
-    st = play('', [{ step: 'resolvePending', role: { kind: 'modifies', target: 0 } }], st)
     expect(st.step).toBe('done')
   })
 

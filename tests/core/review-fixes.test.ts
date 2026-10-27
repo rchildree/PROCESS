@@ -23,10 +23,9 @@ describe('numerals', () => {
   test('indeclinable numeral skips ending and form, then links to its noun', () => {
     const st = play('decem aprōs cēpit.', [
       { step: 'identify', entryId: 'decem-num' }, { step: 'pos', pos: 'ADJ' },
-      { step: 'nomRole', role: { kind: 'pendingNoun' } },
+      { step: 'nomRole', role: { kind: 'modifies', target: 1 } },
       { step: 'identify', entryId: 'aper-n' }, { step: 'pos', pos: 'N' }, { step: 'ending', ending: 'ōs' },
       { step: 'nomForm', form: { c: 'acc', n: 'pl', g: 'm' } }, { step: 'nomRole', role: { kind: 'label', label: 'O' } },
-      { step: 'linkPending', target: 0 },
       { step: 'identify', entryId: 'capio-v' }, { step: 'pos', pos: 'V' }, { step: 'personal', ending: 'it' }, { step: 'stem', stem: 'cēp' }, { step: 'stemType', t: 'pfAct' },
       { step: 'verbForm', form: { k: 'fin', t: 'pf', m: 'ind', v: 'act', p: '3', n: 'sg' } }, { step: 'verbRole', role: { kind: 'label', label: 'V' } },
     ])

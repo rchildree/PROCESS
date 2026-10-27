@@ -121,3 +121,21 @@ describe('going back', () => {
     expect(tagged(st).filter((t) => t.word === 1)).toHaveLength(5)
   })
 })
+
+describe('forward links and changes', () => {
+  const FWD: Answer[] = [
+    { step: 'identify', entryId: 'magnus-adj' }, { step: 'pos', pos: 'ADJ' }, { step: 'ending', ending: 'a' },
+    { step: 'nomForm', form: { c: 'nom', n: 'sg', g: 'f' } }, { step: 'nomRole', role: { kind: 'modifies', target: 1 } },
+    { step: 'identify', entryId: 'puella-n' }, { step: 'pos', pos: 'N' }, { step: 'ending', ending: 'a' },
+    { step: 'nomForm', form: { c: 'nom', n: 'sg', g: 'f' } }, { step: 'nomRole', role: { kind: 'label', label: 'S' } },
+  ]
+
+  test('changing an adjective breaks its link at the later noun', () => {
+    const st = play('magna puella', FWD)
+    expect(st.step).toBe('done')
+    let ed = startEdit(st, 3, lex())
+    ed = submit(ed, { step: 'nomForm', form: { c: 'voc', n: 'sg', g: 'f' } }, lex())
+    expect(ed.editing?.broken?.word).toBe(1)
+    expect(ed.editing?.broken?.reason).toMatch(/case/)
+  })
+})
