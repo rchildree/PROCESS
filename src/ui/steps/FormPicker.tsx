@@ -9,24 +9,56 @@ const TENSE_LABEL: Record<string, string> = { pres: 'Present', impf: 'Imperfect'
 const MOOD_LABEL: Record<string, string> = { ind: 'Indicative', subj: 'Subjunctive', imp: 'Imperative' }
 const VOICE_LABEL: Record<string, string> = { act: 'Active', pass: 'Passive' }
 
-function Group<T extends string>({ title, values, labels, value, onChange }: { title: string; values: T[]; labels: Record<string, string>; value?: T; onChange: (v: T) => void }) {
+function Group<T extends string>({ title, values, labels, value, onChange, off = [], why }: {
+  title: string; values: T[]; labels: Record<string, string>; value?: T; onChange: (v: T) => void
+  /** Values shown greyed out (still clickable), with `why` as their tooltip. */
+  off?: string[]; why?: string
+}) {
   return (
     <fieldset className="group">
       <legend>{title}</legend>
-      {values.map((v) => (
-        <button key={v} type="button" className={value === v ? 'on' : ''} aria-pressed={value === v} onClick={() => onChange(v)}>{labels[v] ?? v}</button>
-      ))}
+      {values.map((v) => {
+        const dis = off.includes(v)
+        return (
+          // Greyed, but still clickable: Check then explains why it does not fit the stem.
+          <button key={v} type="button" className={[value === v ? 'on' : '', dis ? 'off' : ''].join(' ').trim() || undefined}
+            aria-pressed={value === v} title={dis ? why : undefined} onClick={() => onChange(v)}>{labels[v] ?? v}</button>
+        )
+      })}
     </fieldset>
   )
 }
 
-export function NomFormPicker({ options, onSubmit }: { options: Options; onSubmit: (f: NomForm) => void }) {
-  const [c, setC] = useState<NomForm['c']>()
-  const [n, setN] = useState<NomForm['n']>()
-  const [g, setG] = useState<NomForm['g']>()
+/** The ending marked on the previous screen, kept in view while case, number, and gender are chosen. */
+function EndingNote({ ending }: { ending: string }) {
+  return (
+    <div className="ending-note">
+      <span className="muted">Ending</span>
+      <span className="ending-mark">{ending ? `-${ending}` : 'Ø'}</span>
+    </div>
+  )
+}
+
+export function NomFormPicker({ options, ending, agreeWord, onSubmit }: {
+  options: Options; onSubmit: (f: NomForm) => void
+  /** The ending marked on the previous screen. */
+  ending?: string
+  /** The earlier modifier this word was linked to, shown in the note about the preset values. */
+  agreeWord?: string
+}) {
+  const start = options.agree?.form
+  const [c, setC] = useState<NomForm['c'] | undefined>(start?.c)
+  const [n, setN] = useState<NomForm['n'] | undefined>(start?.n)
+  const [g, setG] = useState<NomForm['g'] | undefined>(start?.g)
   const ready = c && n && g
   return (
     <div className="form-picker">
+      {ending !== undefined && <EndingNote ending={ending} />}
+      {start && (
+        <p className="notice preset">
+          Case, number, and gender preselected based on rules of agreement with <em>{agreeWord}</em>. Verify that the information is correct.
+        </p>
+      )}
       <Group title="Case" values={options.cases ?? []} labels={CASE_LABEL} value={c} onChange={setC} />
       <Group title="Number" values={options.numbers ?? []} labels={NUM_LABEL} value={n} onChange={setN} />
       <Group title="Gender" values={options.genders ?? []} labels={GEN_LABEL} value={g} onChange={setG} />
@@ -73,6 +105,7 @@ export function VerbFormPicker({ options, kinds, start, onSubmit }: {
   const [v, setV] = useState<VerbForm['v']>()
   const KIND_LABEL: Record<string, string> = { fin: 'Finite', inf: 'Infinitive' }
   const moods = (options.moods ?? []).filter((x) => x !== 'imp' || kinds.includes('imp'))
+  const off = options.disabled
   const imp = k === 'fin' && m === 'imp'
   const ready = k === 'inf' ? t && v : imp ? p === '2' && n && v : p && n && t && m && v
   const pickMood = (x: Mood) => {
@@ -96,9 +129,9 @@ export function VerbFormPicker({ options, kinds, start, onSubmit }: {
         only={imp ? '2' : undefined} onChange={(pp, nn) => { setP(pp); setN(nn) }} />}
       {imp
         ? <Group title="Tense" values={(options.tenses ?? []).filter((x) => x === 'pres')} labels={TENSE_LABEL} value="pres" onChange={() => {}} />
-        : <Group title="Tense" values={options.tenses ?? []} labels={TENSE_LABEL} value={t} onChange={setT} />}
-      <Group title="Voice" values={options.voices ?? []} labels={VOICE_LABEL} value={v} onChange={setV} />
-      {k === 'fin' && <Group title="Mood" values={moods} labels={MOOD_LABEL} value={m} onChange={pickMood} />}
+        : <Group title="Tense" values={options.tenses ?? []} labels={TENSE_LABEL} value={t} onChange={setT} off={off?.tenses} why={off?.why} />}
+      <Group title="Voice" values={options.voices ?? []} labels={VOICE_LABEL} value={v} onChange={setV} off={off?.voices} why={off?.why} />
+      {k === 'fin' && <Group title="Mood" values={moods} labels={MOOD_LABEL} value={m} onChange={pickMood} off={off?.moods} why={off?.why} />}
       <button type="button" className="primary" disabled={!ready} onClick={submit}>Check</button>
     </div>
   )

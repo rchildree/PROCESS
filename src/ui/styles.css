@@ -209,3 +209,8 @@ button.link, a.link { background: none; border: none; color: var(--muted); text-
   .ending-word { font-size: 32px; }
   .workbench { padding: 16px; }
 }
+.ending-note { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; font-size: 14px; }
+.ending-note .ending-mark { font-family: var(--serif); font-size: 18px; font-weight: 600; padding: 1px 8px; border-radius: 4px; background: var(--accent-soft); }
+.notice.preset { margin: 0; }
+.group button.off:not(.on) { opacity: 0.35; }
+.group button.off.on { opacity: 0.6; }

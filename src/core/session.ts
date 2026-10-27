@@ -6,7 +6,7 @@ import {
 import { NOUN_LABELS, VERB_LABELS } from './data/labels.ts'
 import { analysesFor, checkInfinitiveEnding, checkNominalEnding, checkPersonalEnding } from './endings.ts'
 import type { Token } from './sets.ts'
-import { checkStem, checkStemType, tensesForStem, type StemType } from './stems.ts'
+import { checkStem, checkStemType, STEM_NAME, stemLimits, tensesForStem, type StemType } from './stems.ts'
 import type { Analysis, Case, Check, Gender, Lexicon, Mood, Num, Person, Tense, Voice } from './types.ts'
 
 export type StepId =
@@ -109,6 +109,10 @@ export interface Options {
   labels?: Label[]; nounTargets?: number[]; pos?: UiPos[]
   /** Every word after the current one, for links to a word not reached yet. */
   later?: number[]
+  /** Values shown but greyed out (a verb's tenses, voices and moods its marked stem cannot build), with why. */
+  disabled?: { tenses?: Tense[]; voices?: Voice[]; moods?: Mood[]; why: string }
+  /** An earlier word linked to this one as its modifier: its case, number and gender, to start from. */
+  agree?: { from: number; form: NomForm }
 }
 
 export const ALL_CASES: Case[] = ['nom', 'gen', 'dat', 'acc', 'abl', 'voc']
@@ -533,6 +537,7 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       if (w.path === 'finite' && a.form.k === 'inf') return fail(st, 'This form has a personal ending, so it is not an infinitive.')
       if (w.stemType && a.form.k !== 'imp' && !tensesForStem(w.stemType).includes(a.form.t)) return fail(st, 'That tense is not built on the stem you marked.')
       if (w.stemType && a.form.k === 'imp' && w.stemType !== 'pres') return fail(st, 'An imperative is built on the present stem.')
+      if (w.stemType && !stemLimits(w.stemType).voices.includes(a.form.v)) return fail(st, `The ${STEM_NAME[w.stemType]} stem does not build the passive.`)
       const c = checkVerbForm(lex, surface, w.entryId!, a.form)
       if (!c.ok) return fail(st, c.reason)
       return { ...withWord(st, i, { verbForm: a.form }), step: 'verbRole' }
@@ -666,11 +671,28 @@ export function optionsFor(st: SessionState, _lex?: Lexicon): Options {
   const later = st.tokens.map((_, j) => j).filter((j) => j > i)
   switch (st.step) {
     case 'pos': case 'encliticPos': return { pos: ALL_POS }
-    case 'nomForm': return { cases: ALL_CASES, numbers: ALL_NUMBERS, genders: ALL_GENDERS }
+    case 'nomForm': {
+      const from = incomingLinks(st, i).find((l) => l.kind === 'noun')?.from
+      const form = from === undefined ? undefined : st.words[from].nomForm
+      return { cases: ALL_CASES, numbers: ALL_NUMBERS, genders: ALL_GENDERS, ...(form ? { agree: { from: from!, form } } : {}) }
+    }
     case 'relNG': return { numbers: ALL_NUMBERS, genders: ALL_GENDERS }
     case 'relCase': return { cases: ALL_CASES }
     case 'antecedent': return { nounTargets }
-    case 'verbForm': case 'compoundForm': return { persons: ALL_PERSONS, numbers: ALL_NUMBERS, tenses: ALL_TENSES, moods: ALL_MOODS, voices: ALL_VOICES }
+    case 'verbForm': case 'compoundForm': {
+      const all = { persons: ALL_PERSONS, numbers: ALL_NUMBERS, tenses: ALL_TENSES, moods: ALL_MOODS, voices: ALL_VOICES }
+      if (st.step !== 'verbForm' || !w.stemType) return all
+      const lim = stemLimits(w.stemType)
+      return {
+        ...all,
+        disabled: {
+          tenses: ALL_TENSES.filter((t) => !lim.tenses.includes(t)),
+          voices: ALL_VOICES.filter((v) => !lim.voices.includes(v)),
+          moods: lim.imperative ? [] : ['imp'],
+          why: `Greyed out: not built on the ${STEM_NAME[w.stemType]} stem.`,
+        },
+      }
+    }
     case 'prepCase': return { cases: ['acc', 'abl'] }
     case 'nomRole': return { labels: w.pos === 'ADV' ? ['ADV'] : NOUN_LABELS, nounTargets, later }
     case 'verbRole': case 'compoundRole': return { labels: VERB_LABELS }

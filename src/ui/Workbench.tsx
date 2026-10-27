@@ -124,7 +124,9 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
       break
     case 'nomForm':
       title = 'Case, number, and gender?'
-      body = <NomFormPicker options={options} onSubmit={(form) => onAnswer({ step: 'nomForm', form })} />
+      body = <NomFormPicker options={options} ending={w.ending}
+        agreeWord={options.agree ? wordAt(options.agree.from) : undefined}
+        onSubmit={(form) => onAnswer({ step: 'nomForm', form })} />
       break
     case 'nomRole': {
       if (isRelative(w)) {

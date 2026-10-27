@@ -101,3 +101,11 @@ export function participleName(type: StemType, marker: string | null | undefined
   if (m.startsWith('ur')) return 'fut act ptc'
   return 'pf pass ptc'
 }
+
+/** What a stem can build in a finite form or infinitive: its tenses, voices, and whether an imperative fits. */
+export function stemLimits(type: StemType): { tenses: string[]; voices: string[]; imperative: boolean } {
+  if (type === 'pres') return { tenses: ['pres', 'impf', 'fut'], voices: ['act', 'pass'], imperative: true }
+  // The perfect passive is built on the participle stem with sum, so the perfect active stem is active only.
+  if (type === 'pfAct') return { tenses: ['pf', 'plupf', 'futpf'], voices: ['act'], imperative: false }
+  return { tenses: [], voices: [], imperative: false }
+}
