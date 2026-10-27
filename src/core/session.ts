@@ -1,27 +1,27 @@
 // The step-by-step flow for one sentence, as a pure reducer.
 import {
-  checkAgreement, checkCompoundForm, checkConjType, checkIdentify, checkNomForm, checkNounLabel, checkPos,
+  checkAgreement, checkCompoundForm, compoundForms, checkConjType, checkIdentify, checkNomForm, checkNounLabel, checkPos,
   checkPrepCase, checkVerbForm, checkVerbLabel, type Label, type NomForm, type UiPos, type VerbForm,
 } from './checks.ts'
 import { NOUN_LABELS, VERB_LABELS } from './data/labels.ts'
 import { analysesFor, checkInfinitiveEnding, checkNominalEnding, checkPersonalEnding } from './endings.ts'
 import type { Token } from './sets.ts'
 import { checkStem, checkStemType, tensesForStem, type StemType } from './stems.ts'
-import type { Case, Check, Gender, Lexicon, Mood, Num, Person, Tense, Voice } from './types.ts'
+import type { Analysis, Case, Check, Gender, Lexicon, Mood, Num, Person, Tense, Voice } from './types.ts'
 
 export type StepId =
   | 'identify' | 'pos' | 'ending' | 'nomForm' | 'nomRole' | 'personal' | 'stem' | 'stemType' | 'infEnding' | 'verbForm' | 'verbRole'
   | 'relNG' | 'antecedent' | 'relCase'
   | 'compoundForm' | 'compoundRole' | 'prepCase' | 'conjType' | 'clauseBoundary' | 'encliticPos'
-  | 'encliticConj' | 'done'
+  | 'encliticConj' | 'sumUse' | 'done'
 
 export type Role =
   | { kind: 'label'; label: Label }
   | { kind: 'modifies'; target: number }
   | { kind: 'predicate'; label: 'SC' | 'OC' }
   | { kind: 'substantive'; label: Label }
-  | { kind: 'verbPart'; target?: number }
-  | { kind: 'aux'; target?: number }
+  | { kind: 'verbPart'; target: number }
+  | { kind: 'aux'; target: number }
 
 export type Answer =
   | { step: 'identify'; entryId: string }
@@ -39,6 +39,8 @@ export type Answer =
   | { step: 'conjType' | 'encliticConj'; t: '+' | '↓' }
   | { step: 'encliticPos'; pos: UiPos }
   | { step: 'clauseBoundary'; ends: boolean }
+  /** A form of sum: null = a verb on its own; a number = part of a verb with that later participle. */
+  | { step: 'sumUse'; target: number | null }
 
 export interface Compound { ptc: number; sum: number; form?: VerbForm; label?: Label }
 
@@ -104,7 +106,7 @@ export interface Editing {
 
 export interface Options {
   cases?: Case[]; numbers?: Num[]; genders?: Gender[]; persons?: Person[]; tenses?: Tense[]; moods?: Mood[]; voices?: Voice[]
-  labels?: Label[]; nounTargets?: number[]; pendingTargets?: number[]; pos?: UiPos[]
+  labels?: Label[]; nounTargets?: number[]; pos?: UiPos[]
   /** Every word after the current one, for links to a word not reached yet. */
   later?: number[]
 }
@@ -284,11 +286,9 @@ function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon)
     case 'verbPart': {
       const ptc = w.entryId ? analysesFor(lex, w.entryId, surfaceOf(st.tokens[i])).some((a) => a.k === 'ptc') : false
       if (!ptc) return no('Only a participle can be part of a verb.')
-      if (role.target !== undefined) {
-        const t = st.words[role.target]
-        if (!t || role.target >= i || t.role?.kind !== 'aux' || t.role.target !== undefined) return no('Choose a form of sum that is waiting for a participle.')
-      }
-      return { ok: true }
+      if (!st.tokens[role.target] || role.target <= i) return no('Choose a later word.')
+      return compoundForms(lex, w.entryId!, surfaceOf(st.tokens[i]), surfaceOf(st.tokens[role.target])).length
+        ? { ok: true } : no('These two words do not make one verb form.')
     }
     case 'aux':
       return no('Only a form of sum can be an auxiliary.')
@@ -301,14 +301,6 @@ function checkVerbRole(st: SessionState, i: number, role: Role, lex: Lexicon): C
   if (role.kind === 'label') {
     if (isGloss(w.entryId) || (w.path === 'none' && !w.verbForm)) return VERB_LABELS.includes(role.label) ? { ok: true } : no('That label is not for verbs.')
     return w.verbForm && w.entryId ? checkVerbLabel(lex, w.entryId, w.verbForm, role.label) : no('Missing verb form.')
-  }
-  if (role.kind === 'aux') {
-    if (w.entryId !== 'sum-v') return no('Only a form of sum can be an auxiliary.')
-    if (role.target !== undefined) {
-      const t = st.words[role.target]
-      if (!t || role.target >= i || t.role?.kind !== 'verbPart' || t.role.target !== undefined) return no('Choose a participle that is waiting for its auxiliary.')
-    }
-    return { ok: true }
   }
   return no('Give the verb a verb label.')
 }
@@ -388,12 +380,25 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
     case 'identify': {
       const c = checkIdentify(lex, surface, a.entryId)
       if (!c.ok) return fail(st, c.reason)
+      for (const l of incomingLinks(st, i)) {
+        if (l.kind === 'sum' && a.entryId !== 'sum-v') return fail(st, `${quoted(st, l.from)} was linked to this word as part of a verb with a form of sum.`)
+        if (l.kind === 'ptc' && !compoundForms(lex, a.entryId, surface, surfaceOf(st.tokens[l.from])).length) {
+          return fail(st, `${quoted(st, l.from)} was linked to this word as part of a verb, but these two words do not make one verb form.`)
+        }
+      }
       return { ...withWord(st, i, { entryId: a.entryId }), step: 'pos', error: null }
     }
 
     case 'pos': {
       const asNoun = incomingLinks(st, i).find((l) => l.kind === 'noun')
       if (asNoun && !['N', 'ADJ', 'PRO'].includes(a.pos)) return fail(st, `${quoted(st, asNoun.from)} was linked to this word as its noun.`)
+      const asVerb = incomingLinks(st, i).find((l) => l.kind !== 'noun')
+      if (asVerb && a.pos !== 'V') return fail(st, `${quoted(st, asVerb.from)} was linked to this word as part of a verb.`)
+      if (asVerb?.kind === 'sum') {
+        // The participle already chose this form of sum: go straight to the two words together.
+        st = withWord(st, i, { pos: a.pos, path: 'none', role: { kind: 'aux', target: asVerb.from } })
+        return { ...st, step: 'compoundForm' }
+      }
       if (!isGloss(w.entryId)) {
         const c = checkPos(lex, surface, w.entryId!, a.pos)
         if (!c.ok) return fail(st, c.reason)
@@ -416,12 +421,9 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       switch (a.pos) {
         case 'N': case 'ADJ': case 'PRO':
           return { ...withWord(st, i, { path: 'nominal' }), step: 'ending' }
-        case 'V': {
-          const an = anAll
-          if (an.length && an.every((x) => x.k === 'ptc' || x.k === 'ger')) return { ...withWord(st, i, { path: 'nominal' }), step: 'ending' }
-          if (an.some((x) => x.k === 'inf')) return { ...withWord(st, i, { path: 'inf' }), step: 'infEnding' }
-          return { ...withWord(st, i, { path: 'finite' }), step: 'personal' }
-        }
+        case 'V':
+          if (w.entryId === 'sum-v') return { ...st, step: 'sumUse' }
+          return verbPath(st, i, anAll)
         case 'ADV': return { ...withWord(st, i, { path: 'none' }), step: 'nomRole' }
         case 'PREP': return { ...st, step: 'prepCase' }
         case 'CONJ': return { ...st, step: 'conjType' }
@@ -486,18 +488,21 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
     case 'nomForm': {
       const c = checkNomForm(lex, surface, w.entryId!, a.form)
       if (!c.ok) return fail(st, c.reason)
-      return { ...withWord(st, i, { nomForm: a.form }), step: 'nomRole' }
+      st = withWord(st, i, { nomForm: a.form })
+      const sum = incomingLinks(st, i).find((l) => l.kind === 'ptc')
+      if (sum) {
+        // A form of sum already chose this participle: no role question, straight to the two words together.
+        st = withWord(st, i, { role: { kind: 'verbPart', target: sum.from }, compound: { ptc: i, sum: sum.from } })
+        return { ...st, step: 'compoundForm' }
+      }
+      return { ...st, step: 'nomRole' }
     }
 
     case 'nomRole': {
       const c = checkNominalRole(st, i, a.role, lex)
       if (!c.ok) return fail(st, c.reason)
       st = withWord(st, i, { role: a.role })
-      if (a.role.kind === 'verbPart' && a.role.target !== undefined) {
-        st = withWord(st, a.role.target, { role: { kind: 'aux', target: i } })
-        const compound: Compound = { ptc: i, sum: a.role.target }
-        return { ...withWord(st, i, { compound }), step: 'compoundForm' }
-      }
+      if (a.role.kind === 'verbPart') return finishWord(withWord(st, i, { compound: { ptc: i, sum: a.role.target } }))
       st = closePPIfObject(st, i)
       if (isRelative(st.words[i])) {
         const clauses = [...st.clauses, { conj: i, hasFiniteVerb: false }]
@@ -532,12 +537,6 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       const c = checkVerbRole(st, i, a.role, lex)
       if (!c.ok) return fail(st, c.reason)
       st = withWord(st, i, { role: a.role })
-      if (a.role.kind === 'aux') {
-        if (a.role.target === undefined) return finishWord(st)
-        const p = a.role.target
-        st = withWord(st, p, { role: { kind: 'verbPart', target: i }, compound: { ptc: p, sum: i } })
-        return { ...st, step: 'compoundForm' }
-      }
       if (w.verbForm?.k === 'fin' || w.verbForm?.k === 'imp' || (w.path === 'none' && !w.verbForm)) st = markFinite(st)
       return finishWord(st)
     }
@@ -559,7 +558,8 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       const c = checkVerbLabel(lex, st.words[cp.ptc].entryId!, cp.form, a.role.label)
       if (!c.ok) return fail(st, c.reason)
       st = withWord(st, cp.ptc, { compound: { ...cp, label: a.role.label } })
-      if (cp.form.k === 'fin') st = markFinite(st)
+      // When sum came first, its clause was marked when it was linked.
+      if (cp.form.k === 'fin' && cp.sum === i) st = markFinite(st)
       return finishWord(st)
     }
 
@@ -604,6 +604,18 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       return finishWord(withWord(st, i, { enclitic: { pos: 'CONJ', conjType: '+', done: true } }))
     }
 
+    case 'sumUse': {
+      if (a.target === null) return verbPath(st, i, analysesFor(lex, w.entryId!, surface))
+      const t = a.target
+      if (!st.tokens[t] || t <= i) return fail(st, 'Choose a later word.')
+      const later = surfaceOf(st.tokens[t])
+      const fits = lex.lookup(later).some((c) => c.analyses.some((x) => x.k === 'ptc') && compoundForms(lex, c.entryId, later, surface).length > 0)
+      if (!fits) return fail(st, 'These two words do not make one verb form.')
+      st = withWord(st, i, { path: 'none', role: { kind: 'aux', target: t } })
+      if (analysesFor(lex, w.entryId!, surface).some((x) => x.k === 'fin')) st = markFinite(st)
+      return finishWord(st)
+    }
+
     case 'clauseBoundary': {
       const last = i === st.tokens.length - 1
       const top = st.clauses[st.clauses.length - 1]
@@ -621,6 +633,13 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
   }
 }
 
+/** The verb steps that follow part of speech: participles decline, infinitives and finite forms do not. */
+function verbPath(st: SessionState, i: number, an: Analysis[]): SessionState {
+  if (an.length && an.every((x) => x.k === 'ptc' || x.k === 'ger')) return { ...withWord(st, i, { path: 'nominal' }), step: 'ending' }
+  if (an.some((x) => x.k === 'inf')) return { ...withWord(st, i, { path: 'inf' }), step: 'infEnding' }
+  return { ...withWord(st, i, { path: 'finite' }), step: 'personal' }
+}
+
 function allowedPosForGloss(pos: string): UiPos[] {
   const map: Record<string, UiPos[]> = { n: ['N'], adj: ['ADJ'], num: ['ADJ'], pron: ['PRO'], v: ['V'], adv: ['ADV'], prep: ['PREP'], conj: ['CONJ'] }
   return map[pos] ?? ['OTHER']
@@ -635,7 +654,7 @@ export function findCompound(st: SessionState, i: number): Compound | undefined 
 
 // ---------- options & replay ----------
 
-export function optionsFor(st: SessionState, lex: Lexicon): Options {
+export function optionsFor(st: SessionState, _lex?: Lexicon): Options {
   const i = activeIndex(st)
   const w = st.words[i]
   const nounTargets = st.words.map((x, j) => ({ x, j })).filter(({ x, j }) => j < i && isNounLike(x)).map(({ j }) => j)
@@ -648,15 +667,9 @@ export function optionsFor(st: SessionState, lex: Lexicon): Options {
     case 'antecedent': return { nounTargets }
     case 'verbForm': case 'compoundForm': return { persons: ALL_PERSONS, numbers: ALL_NUMBERS, tenses: ALL_TENSES, moods: ALL_MOODS, voices: ALL_VOICES }
     case 'prepCase': return { cases: ['acc', 'abl'] }
-    case 'nomRole': {
-      const pendingTargets = st.words.map((x, j) => ({ x, j })).filter(({ x, j }) => j < i && x.role?.kind === 'aux' && x.role.target === undefined).map(({ j }) => j)
-      const ptc = w.entryId && !isGloss(w.entryId) ? analysesFor(lex, w.entryId, surfaceOf(st.tokens[i])).some((a) => a.k === 'ptc') : false
-      return { labels: w.pos === 'ADV' ? ['ADV'] : NOUN_LABELS, nounTargets, later, pendingTargets: ptc ? pendingTargets : [] }
-    }
-    case 'verbRole': case 'compoundRole': {
-      const pendingTargets = st.words.map((x, j) => ({ x, j })).filter(({ x, j }) => j < i && x.role?.kind === 'verbPart' && x.role.target === undefined).map(({ j }) => j)
-      return { labels: VERB_LABELS, pendingTargets: st.step === 'verbRole' && w.entryId === 'sum-v' ? pendingTargets : [] }
-    }
+    case 'nomRole': return { labels: w.pos === 'ADV' ? ['ADV'] : NOUN_LABELS, nounTargets, later }
+    case 'verbRole': case 'compoundRole': return { labels: VERB_LABELS }
+    case 'sumUse': return { later }
     default: return {}
   }
 }

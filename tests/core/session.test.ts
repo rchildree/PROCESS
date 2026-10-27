@@ -62,8 +62,8 @@ describe('full sentences', () => {
       { step: 'identify', entryId: 'in-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
       ...noun('ager-n', 'ō', nf('abl', 'sg', 'm'), 'PP'),
       { step: 'identify', entryId: 'instruo-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'a' },
-      { step: 'stem', stem: 'īnstrūct' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: nf('nom', 'sg', 'f') }, { step: 'nomRole', role: { kind: 'verbPart' } },
-      ...verb('sum-v', 't', 'es', 'pres', fin('pres', 'act', '3', 'sg')), { step: 'verbRole', role: { kind: 'aux', target: 7 } },
+      { step: 'stem', stem: 'īnstrūct' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: nf('nom', 'sg', 'f') }, { step: 'nomRole', role: { kind: 'verbPart', target: 8 } },
+      { step: 'identify', entryId: 'sum-v' }, { step: 'pos', pos: 'V' },
       { step: 'compoundForm', form: fin('pf', 'pass', '3', 'sg') },
       { step: 'compoundRole', role: { kind: 'label', label: 'PV' } },
     ])
@@ -170,4 +170,55 @@ test('a correct answer after a rejected one is logged and clears the error', () 
   expect(good.error).toBeNull()
   expect(good.step).toBe('ending')
   expect(good.log).toHaveLength(2)
+})
+
+describe('two-word verbs', () => {
+  const ptc: Answer[] = [
+    { step: 'identify', entryId: 'appello-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'us' },
+    { step: 'stem', stem: 'appellāt' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: nf('nom', 'sg', 'm') },
+  ]
+  const carbo = noun('carbo-n', '', nf('nom', 'sg', 'm'), 'S')
+
+  test('sum first: est appellātus', () => {
+    let st = play('Carbō est appellātus.', [...carbo, { step: 'identify', entryId: 'sum-v' }, { step: 'pos', pos: 'V' }])
+    expect(st.step).toBe('sumUse')
+    st = play('', [{ step: 'sumUse', target: 2 }], st)
+    expect(st.current).toBe(2)
+    expect(st.words[1]).toMatchObject({ done: true, role: { kind: 'aux', target: 2 } })
+    expect(st.words[1].personal).toBeUndefined()
+    st = play('', ptc, st)
+    expect(st.step).toBe('compoundForm')
+    st = play('', [{ step: 'compoundForm', form: fin('pf', 'pass', '3', 'sg') }, { step: 'compoundRole', role: { kind: 'label', label: 'PV' } }], st)
+    expect(st.step).toBe('done')
+    expect(st.words[2].compound).toMatchObject({ ptc: 2, sum: 1, label: 'PV' })
+  })
+
+  test('sumUse null takes the normal verb path', () => {
+    const st = play('Carbō est', [...carbo, { step: 'identify', entryId: 'sum-v' }, { step: 'pos', pos: 'V' }, { step: 'sumUse', target: null }])
+    expect(st.step).toBe('personal')
+  })
+
+  test('sum linked to a word that is not a participle is refused', () => {
+    const st = play('est puer', [{ step: 'identify', entryId: 'sum-v' }, { step: 'pos', pos: 'V' }])
+    expect(submit(st, { step: 'sumUse', target: 1 }, lex()).error).toMatch(/one verb form/)
+  })
+
+  test('participle link to a word that is not sum is refused', () => {
+    const st = play('appellātus puer', ptc)
+    expect(submit(st, { step: 'nomRole', role: { kind: 'verbPart', target: 1 } }, lex()).error).toMatch(/one verb form/)
+  })
+
+  test('a word linked as sum must be a verb', () => {
+    const st = play('appellātus est', [...ptc, { step: 'nomRole', role: { kind: 'verbPart', target: 1 } }, { step: 'identify', entryId: 'sum-v' }])
+    expect(submit(st, { step: 'pos', pos: 'N' }, lex()).error).toBeTruthy()
+  })
+
+  test('sum first in a ↓ clause marks the clause finite', () => {
+    const st = play('dum est appellātus', [
+      { step: 'identify', entryId: 'dum-conj' }, { step: 'pos', pos: 'CONJ' }, { step: 'conjType', t: '↓' },
+      { step: 'identify', entryId: 'sum-v' }, { step: 'pos', pos: 'V' }, { step: 'sumUse', target: 2 },
+    ])
+    expect(st.step).toBe('clauseBoundary')
+    expect(submit(st, { step: 'clauseBoundary', ends: true }, lex()).error).toBeNull()
+  })
 })
