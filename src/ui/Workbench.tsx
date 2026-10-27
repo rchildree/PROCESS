@@ -8,7 +8,7 @@ import { ChoiceStep } from './steps/ChoiceStep.tsx'
 import { EndingSelector } from './steps/EndingSelector.tsx'
 import { NomFormPicker, NumGenPicker, VerbFormPicker } from './steps/FormPicker.tsx'
 import { IdentifyStep } from './steps/IdentifyStep.tsx'
-import { LaterPicker, RoleStep } from './steps/RoleStep.tsx'
+import { PickWord, RoleStep, WordRow } from './steps/RoleStep.tsx'
 import { StemSelector } from './steps/StemSelector.tsx'
 import { describeAnswer, POS_NAME, segments, STEP_NAME } from './summary.ts'
 
@@ -79,10 +79,10 @@ function EditNotice({ st, onCancel }: { st: SessionState; onCancel?: () => void 
   return <div className="notice">Still carrying your change to <strong>{changed}</strong> through the sentence.</div>
 }
 
-function SumUse({ later, wordAt, onPick }: { later: number[]; wordAt: (i: number) => string; onPick: (t: number | null) => void }) {
+function SumUse({ here, count, wordAt, onPick }: { here: number; count: number; wordAt: (i: number) => string; onPick: (t: number | null) => void }) {
   const [picking, setPicking] = useState(false)
   if (picking) {
-    return <LaterPicker heading="Which later word is the participle?" later={later} wordAt={wordAt} onPick={onPick} onBack={() => setPicking(false)} />
+    return <PickWord heading="Which word is the participle?" here={here} count={count} wordAt={wordAt} onPick={onPick} onBack={() => setPicking(false)} />
   }
   return (
     <div className="choices">
@@ -105,6 +105,7 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
   const wordAt = (j: number) => surfaceOf(st.tokens[j])
   const isPtc = !!w?.entryId && w.pos === 'V' && w.path === 'nominal'
   const cp = tok ? findCompound(st, i) : undefined
+  const row = { here: i, count: st.tokens.length, wordAt }
 
   let title = ''
   let body: React.ReactNode = null
@@ -131,12 +132,12 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
     case 'nomRole': {
       if (isRelative(w)) {
         title = 'What is its function in its own clause?'
-        body = <RoleStep kind="noun" options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
+        body = <RoleStep {...row} kind="noun" options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
         break
       }
       const kind = w.pos === 'N' ? 'noun' : w.pos === 'ADV' ? 'adverb' : w.pos === 'PRO' ? 'pronoun' : 'adjective'
       title = kind === 'noun' ? 'What is its function?' : kind === 'adverb' ? 'Label it.' : 'What does it do in the sentence?'
-      body = <RoleStep kind={kind} participle={isPtc} options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
+      body = <RoleStep {...row} kind={kind} participle={isPtc} options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
       break
     }
     case 'personal':
@@ -160,11 +161,11 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
     case 'antecedent':
       title = 'Which word is its antecedent?'
       body = (
-        <div className="choices">
-          {(options.nounTargets ?? []).map((t) => (
-            <button key={t} type="button" onClick={() => onAnswer({ step: 'antecedent', target: t })}><em>{wordAt(t)}</em></button>
-          ))}
-          <button type="button" onClick={() => onAnswer({ step: 'antecedent', target: null })}>No antecedent stated</button>
+        <div className="roles">
+          <WordRow {...row} onPick={(target) => onAnswer({ step: 'antecedent', target })} />
+          <div className="choices">
+            <button type="button" onClick={() => onAnswer({ step: 'antecedent', target: null })}>No antecedent stated</button>
+          </div>
         </div>
       )
       break
@@ -184,7 +185,7 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
     }
     case 'verbRole':
       title = 'Label the verb.'
-      body = <RoleStep kind="verb" options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'verbRole', role })} />
+      body = <RoleStep {...row} kind="verb" options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'verbRole', role })} />
       break
     case 'compoundForm':
       title = cp ? `Parse “${wordAt(cp.ptc)} ${wordAt(cp.sum)}” together.` : 'Parse the compound verb.'
@@ -192,7 +193,7 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
       break
     case 'compoundRole':
       title = cp ? `Label the verb “${wordAt(cp.ptc)} ${wordAt(cp.sum)}”.` : 'Label the verb.'
-      body = <RoleStep kind="verb" options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'compoundRole', role })} />
+      body = <RoleStep {...row} kind="verb" options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'compoundRole', role })} />
       break
     case 'prepCase':
       title = 'What case does this preposition take here?'
@@ -204,7 +205,11 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
       break
     case 'sumUse':
       title = 'Is this form of sum a verb on its own?'
-      body = <SumUse later={options.later ?? []} wordAt={wordAt} onPick={(target) => onAnswer({ step: 'sumUse', target })} />
+      body = <SumUse {...row} onPick={(target) => onAnswer({ step: 'sumUse', target })} />
+      break
+    case 'completes':
+      title = 'Completes what finite verb?'
+      body = <WordRow {...row} onPick={(target) => onAnswer({ step: 'completes', target })} />
       break
     case 'clauseBoundary':
       title = 'Does the ↓ clause end after this word?'

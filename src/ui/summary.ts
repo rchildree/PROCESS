@@ -66,6 +66,7 @@ export function detailsOf(st: SessionState, i: number, words: WordState[] = st.w
   if (r?.kind === 'predicate') lines.push(['pred.'])
   if (r?.kind === 'verbPart' || r?.kind === 'aux') lines.push(['+ ', la(r.target)])
   if (w.compound?.form) lines.push([verbText(w.compound.form)])
+  if (w.completes !== undefined) lines.push(['→ ', la(w.completes)])
   if (w.enclitic?.done) lines.push([{ la: `-${st.tokens[i].enclitic}` }])
   return lines
 }
@@ -77,7 +78,7 @@ export const STEP_NAME: Record<StepId, string> = {
   personal: 'Personal ending', stem: 'Stem', stemType: 'Stem type', infEnding: 'Ending', verbForm: 'Verb form', verbRole: 'Function',
   relNG: 'Number, gender', antecedent: 'Antecedent', relCase: 'Case', compoundForm: 'Compound verb form', compoundRole: 'Compound verb label',
   prepCase: 'Case it takes', conjType: 'Conjunction type', clauseBoundary: 'Clause end',
-  encliticPos: 'Enclitic part of speech', encliticConj: 'Enclitic type', sumUse: 'On its own or part of a verb', done: '',
+  encliticPos: 'Enclitic part of speech', encliticConj: 'Enclitic type', sumUse: 'On its own or part of a verb', completes: 'Completes', done: '',
 }
 
 function roleText(r: Role, word: (j: number) => string): string {
@@ -105,6 +106,7 @@ export function describeAnswer(a: Answer, st: SessionState, lex: Lexicon): strin
     case 'verbForm': case 'compoundForm': return verbText(a.form)
     case 'nomRole': case 'verbRole': case 'compoundRole': return roleText(a.role, word)
     case 'sumUse': return a.target === null ? 'on its own' : `part of a verb with ${word(a.target)}`
+    case 'completes': return word(a.target)
     case 'conjType': case 'encliticConj': return a.t === '+' ? '+ coordinating' : '↓ subordinating'
     case 'clauseBoundary': return a.ends ? 'clause ends here' : 'clause continues'
   }

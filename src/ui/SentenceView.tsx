@@ -21,6 +21,10 @@ function linksOf(words: WordState[]): Link[] {
     // A link to a later word stays provisional (dashed, with a ?) until that word is finished and the link checked.
     if (r && 'target' in r && r.target > i && !words[r.target]?.done) out.push({ from: i, to: r.target, kind: 'pending' })
     else if (r?.kind === 'modifies') out.push({ from: i, to: r.target, kind: 'mod' })
+    if (w.completes !== undefined) {
+      const t = w.completes
+      out.push({ from: i, to: t, kind: t > i && !words[t]?.done ? 'pending' : 'mod' })
+    }
     if (w.antecedent !== undefined && w.antecedent !== null) out.push({ from: i, to: w.antecedent, kind: 'ante' })
   })
   return out

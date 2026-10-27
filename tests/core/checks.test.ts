@@ -78,7 +78,7 @@ describe('labels', () => {
     expect(ok(checkVerbLabel(L(), 'appello-v', act, '='))).toBe(false)
   })
   test('label list', () => {
-    expect(LABELS.map((l) => l.id)).toEqual(['S', 'O', 'SC', 'OC', 'V', 'PV', '=', 'X', 'PP', 'ADV', '+', '↓', '——'])
+    expect(LABELS.map((l) => l.id)).toEqual(['S', 'O', 'SC', 'OC', 'V', 'PV', '=', 'X', 'PP', 'ADV', '+', '↓', '——', 'CINF'])
   })
 })
 

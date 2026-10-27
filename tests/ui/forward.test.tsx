@@ -15,13 +15,14 @@ function at(text: string, answers: Answer[]) {
   return st
 }
 
-test('an adjective can pick its noun from the later words', () => {
+test('an adjective picks its noun from the whole sentence, with its own place marked', () => {
   const st = at('magnae puellae vident', [{ step: 'identify', entryId: 'magnus-adj' }, { step: 'pos', pos: 'ADJ' }, { step: 'ending', ending: 'ae' },
     { step: 'nomForm', form: { c: 'nom', n: 'pl', g: 'f' } }])
   const onAnswer = vi.fn()
   render(<Workbench st={st} lex={lex()} onAnswer={onAnswer} />)
-  fireEvent.click(screen.getByRole('button', { name: 'its noun comes later' }))
   expect(screen.getByRole('button', { name: 'vident' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'magnae' })).toBeNull()
+  expect(document.querySelector('.word-row .here')?.textContent).toBe('magnae')
   fireEvent.click(screen.getByRole('button', { name: 'puellae' }))
   expect(onAnswer).toHaveBeenCalledWith({ step: 'nomRole', role: { kind: 'modifies', target: 1 } })
 })

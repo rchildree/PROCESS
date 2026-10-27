@@ -8,6 +8,9 @@ interface Props {
   participle?: boolean
   options: Options
   wordAt: (i: number) => string
+  /** The current word's place in the sentence, and the sentence's length, for picking a linked word. */
+  here: number
+  count: number
   onRole: (r: Role) => void
 }
 
@@ -26,35 +29,43 @@ function Labels({ labels, onPick }: { labels: Label[]; onPick: (l: Label) => voi
   )
 }
 
-/** The words after the current one, as buttons: for linking to a word not reached yet. */
-export function LaterPicker({ heading, later, wordAt, onPick, onBack }: {
-  heading: string; later: number[]; wordAt: (i: number) => string; onPick: (i: number) => void; onBack: () => void
-}) {
+/**
+ * The sentence's words in order, each a button, for linking to another word on either side.
+ * The current word stays in its place as plain text, marked by a small triangle beneath it.
+ */
+export function WordRow({ here, count, wordAt, onPick }: { here: number; count: number; wordAt: (i: number) => string; onPick: (i: number) => void }) {
   return (
-    <div className="roles">
-      <h4>{heading}</h4>
-      <div className="choices">
-        {later.map((t) => <button key={t} type="button" onClick={() => onPick(t)}><em>{wordAt(t)}</em></button>)}
-        {later.length === 0 && <span className="muted">This is the last word.</span>}
-      </div>
-      <button type="button" className="link" onClick={onBack}>← back</button>
+    <div className="choices word-row">
+      {Array.from({ length: count }, (_, j) => j === here
+        ? <span key={j} className="here" aria-current="true"><em>{wordAt(j)}</em></span>
+        : <button key={j} type="button" onClick={() => onPick(j)}><em>{wordAt(j)}</em></button>)}
     </div>
   )
 }
 
-export function RoleStep({ kind, participle, options, wordAt, onRole }: Props) {
-  const [sub, setSub] = useState<'substantive' | 'nounLater' | 'verbLater' | null>(null)
+/** A sub-question that picks one word of the sentence, with a way back. */
+function PickWord({ heading, here, count, wordAt, onPick, onBack }: {
+  heading: string; here: number; count: number; wordAt: (i: number) => string; onPick: (i: number) => void; onBack: () => void
+}) {
+  return (
+    <div className="roles">
+      <h4>{heading}</h4>
+      <WordRow here={here} count={count} wordAt={wordAt} onPick={onPick} />
+      <button type="button" className="link" onClick={onBack}>← back</button>
+    </div>
+  )
+}
+export { PickWord }
+
+export function RoleStep({ kind, participle, options, wordAt, here, count, onRole }: Props) {
+  const [sub, setSub] = useState<'substantive' | 'sum' | null>(null)
 
   if (kind === 'adverb') return <Labels labels={['ADV']} onPick={(label) => onRole({ kind: 'label', label })} />
 
   if (kind === 'verb') return <Labels labels={options.labels ?? []} onPick={(label) => onRole({ kind: 'label', label })} />
 
-  if (sub === 'nounLater') {
-    return <LaterPicker heading="Which later word is its noun?" later={options.later ?? []} wordAt={wordAt}
-      onPick={(target) => onRole({ kind: 'modifies', target })} onBack={() => setSub(null)} />
-  }
-  if (sub === 'verbLater') {
-    return <LaterPicker heading="Which later word is the form of sum?" later={options.later ?? []} wordAt={wordAt}
+  if (sub === 'sum') {
+    return <PickWord heading="Which word is the form of sum?" here={here} count={count} wordAt={wordAt}
       onPick={(target) => onRole({ kind: 'verbPart', target })} onBack={() => setSub(null)} />
   }
 
@@ -80,12 +91,7 @@ export function RoleStep({ kind, participle, options, wordAt, onRole }: Props) {
       )}
       <section>
         <h4>Modifies a noun</h4>
-        <div className="choices">
-          {(options.nounTargets ?? []).map((t) => (
-            <button key={t} type="button" onClick={() => onRole({ kind: 'modifies', target: t })}><em>{wordAt(t)}</em></button>
-          ))}
-          <button type="button" onClick={() => setSub('nounLater')}>its noun comes later</button>
-        </div>
+        <WordRow here={here} count={count} wordAt={wordAt} onPick={(target) => onRole({ kind: 'modifies', target })} />
       </section>
       {kind === 'adjective' && (
         <section>
@@ -101,7 +107,7 @@ export function RoleStep({ kind, participle, options, wordAt, onRole }: Props) {
         <section>
           <h4>Part of a verb with a form of sum</h4>
           <div className="choices">
-            <button type="button" onClick={() => setSub('verbLater')}>part of a verb with…</button>
+            <button type="button" onClick={() => setSub('sum')}>part of a verb with…</button>
           </div>
         </section>
       )}

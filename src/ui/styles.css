@@ -214,3 +214,10 @@ button.link, a.link { background: none; border: none; color: var(--muted); text-
 .notice.preset { margin: 0; }
 .group button.off:not(.on) { opacity: 0.35; }
 .group button.off.on { opacity: 0.6; }
+/* Picking a linked word: the sentence in order, the current word marked by a small triangle beneath it. */
+.word-row { align-items: center; padding-bottom: 8px; }
+.word-row .here { position: relative; padding: 0 6px; color: var(--muted); }
+.word-row .here::after {
+  content: ''; position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%);
+  border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 6px solid var(--accent);
+}

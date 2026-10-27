@@ -112,6 +112,7 @@ export function checkVerbLabel(lex: Lexicon, entryId: string, f: VerbForm, label
       if (COPULAR_PASSIVE.includes(entryId) && f.v === 'pass') return yes
       return no('This verb cannot be copular here.')
     case 'X': return EXISTENTIAL.includes(entryId) ? yes : no('Only a form of sum can be existential.')
+    case 'CINF': return f.k === 'inf' ? yes : no('Only an infinitive can be a complementary infinitive.')
     default: return no('That label is not for verbs.')
   }
 }

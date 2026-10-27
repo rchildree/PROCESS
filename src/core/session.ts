@@ -13,7 +13,7 @@ export type StepId =
   | 'identify' | 'pos' | 'ending' | 'nomForm' | 'nomRole' | 'personal' | 'stem' | 'stemType' | 'infEnding' | 'verbForm' | 'verbRole'
   | 'relNG' | 'antecedent' | 'relCase'
   | 'compoundForm' | 'compoundRole' | 'prepCase' | 'conjType' | 'clauseBoundary' | 'encliticPos'
-  | 'encliticConj' | 'sumUse' | 'done'
+  | 'encliticConj' | 'sumUse' | 'completes' | 'done'
 
 export type Role =
   | { kind: 'label'; label: Label }
@@ -41,6 +41,8 @@ export type Answer =
   | { step: 'clauseBoundary'; ends: boolean }
   /** A form of sum: null = a verb on its own; a number = part of a verb with that later participle. */
   | { step: 'sumUse'; target: number | null }
+  /** A complementary infinitive: the finite verb it completes. */
+  | { step: 'completes'; target: number }
 
 export interface Compound { ptc: number; sum: number; form?: VerbForm; label?: Label }
 
@@ -65,6 +67,8 @@ export interface WordState {
   prepCase?: Case
   conjType?: '+' | '↓'
   compound?: Compound
+  /** A complementary infinitive (CINF): the finite verb it completes. */
+  completes?: number
   enclitic?: { pos?: UiPos; conjType?: '+' | '↓'; done: boolean }
   clauseDepth: number
   done: boolean
@@ -106,9 +110,7 @@ export interface Editing {
 
 export interface Options {
   cases?: Case[]; numbers?: Num[]; genders?: Gender[]; persons?: Person[]; tenses?: Tense[]; moods?: Mood[]; voices?: Voice[]
-  labels?: Label[]; nounTargets?: number[]; pos?: UiPos[]
-  /** Every word after the current one, for links to a word not reached yet. */
-  later?: number[]
+  labels?: Label[]; pos?: UiPos[]
   /** Values shown but greyed out (a verb's tenses, voices and moods its marked stem cannot build), with why. */
   disabled?: { tenses?: Tense[]; voices?: Voice[]; moods?: Mood[]; why: string }
   /** An earlier word linked to this one as its modifier: its case, number and gender, to start from. */
@@ -146,7 +148,7 @@ export function isNounLike(w: WordState): boolean {
   return w.role.kind === 'label' && (w.pos === 'N' || w.pos === 'PRO')
 }
 
-export interface IncomingLink { from: number; kind: 'noun' | 'sum' | 'ptc' }
+export interface IncomingLink { from: number; kind: 'noun' | 'sum' | 'ptc' | 'cinf' }
 
 /** Earlier words that point forward to word j: an adjective to its noun, a participle to its sum, a sum to its participle. */
 export function incomingLinks(st: SessionState, j: number): IncomingLink[] {
@@ -158,6 +160,7 @@ export function incomingLinks(st: SessionState, j: number): IncomingLink[] {
     if (r.kind === 'verbPart') out.push({ from, kind: 'sum' })
     if (r.kind === 'aux') out.push({ from, kind: 'ptc' })
   })
+  st.words.forEach((x, from) => { if (from < j && x.completes === j) out.push({ from, kind: 'cinf' }) })
   return out
 }
 
@@ -175,6 +178,26 @@ function checkIncomingNoun(st: SessionState, i: number): string | null {
       const c = checkAgreement(f, w.nomForm)
       if (!c.ok) return `${quoted(st, l.from)} goes with this word, but ${lowerFirst(c.reason)}`
     }
+  }
+  return null
+}
+
+/** Is word j, already parsed, a finite verb? A form of sum or participle waiting for its partner counts for now. */
+function isFiniteVerb(st: SessionState, j: number, pending = false): boolean {
+  const w = st.words[j]
+  if (!w || w.pos !== 'V') return false
+  const cp = findCompound(st, j)
+  if (cp?.form) return cp.form.k === 'fin'
+  if (w.role?.kind === 'aux' || w.role?.kind === 'verbPart') return pending
+  if (w.verbForm) return w.verbForm.k === 'fin' || w.verbForm.k === 'imp'
+  // Glossed verbs carry no form to check; a CINF is never the finite verb.
+  return w.path === 'none' && !(w.role?.kind === 'label' && w.role.label === 'CINF')
+}
+
+/** An earlier complementary infinitive linked to this word: it must be a finite verb. */
+function checkIncomingCinf(st: SessionState, i: number): string | null {
+  for (const l of incomingLinks(st, i)) {
+    if (l.kind === 'cinf' && !isFiniteVerb(st, i, true)) return `${quoted(st, l.from)} was linked to this word as the finite verb it completes, but this is not a finite verb.`
   }
   return null
 }
@@ -217,7 +240,7 @@ function finishWord(st: SessionState): SessionState {
   const i = st.current
   const tok = st.tokens[i]
   const w = st.words[i]
-  const linkErr = checkIncomingNoun(st, i)
+  const linkErr = checkIncomingNoun(st, i) ?? checkIncomingCinf(st, i)
   if (linkErr) return fail(st, linkErr)
   if (tok.enclitic && !w.enclitic?.done) {
     return { ...withWord(st, i, { enclitic: { done: false } }), step: 'encliticPos' }
@@ -292,7 +315,7 @@ function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon)
       const ptc = w.entryId ? analysesFor(lex, w.entryId, surfaceOf(st.tokens[i])).some((a) => a.k === 'ptc') : false
       if (!ptc) return no('Only a participle can be part of a verb.')
       if (!st.tokens[role.target] || role.target <= i) return no('Choose a later word.')
-      if (incomingLinks(st, role.target).some((l) => l.kind !== 'noun')) return no('Another word is already part of a verb with that word.')
+      if (incomingLinks(st, role.target).some((l) => l.kind === 'sum' || l.kind === 'ptc')) return no('Another word is already part of a verb with that word.')
       return compoundForms(lex, w.entryId!, surfaceOf(st.tokens[i]), surfaceOf(st.tokens[role.target])).length
         ? { ok: true } : no('These two words do not make one verb form.')
     }
@@ -401,8 +424,10 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
     case 'pos': {
       const asNoun = incomingLinks(st, i).find((l) => l.kind === 'noun')
       if (asNoun && !['N', 'ADJ', 'PRO'].includes(a.pos)) return fail(st, `${quoted(st, asNoun.from)} was linked to this word as its noun.`)
-      const asVerb = incomingLinks(st, i).find((l) => l.kind !== 'noun')
+      const asVerb = incomingLinks(st, i).find((l) => l.kind === 'sum' || l.kind === 'ptc')
       if (asVerb && a.pos !== 'V') return fail(st, `${quoted(st, asVerb.from)} was linked to this word as part of a verb.`)
+      const asFinite = incomingLinks(st, i).find((l) => l.kind === 'cinf')
+      if (asFinite && a.pos !== 'V') return fail(st, `${quoted(st, asFinite.from)} was linked to this word as the finite verb it completes.`)
       if (asVerb?.kind === 'sum') {
         // The participle already chose this form of sum: go straight to the two words together.
         st = withWord(st, i, { pos: a.pos, path: 'none', role: { kind: 'aux', target: asVerb.from } })
@@ -547,8 +572,22 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       const c = checkVerbRole(st, i, a.role, lex)
       if (!c.ok) return fail(st, c.reason)
       st = withWord(st, i, { role: a.role })
+      if (a.role.kind === 'label' && a.role.label === 'CINF') return { ...st, step: 'completes' }
       if (w.verbForm?.k === 'fin' || w.verbForm?.k === 'imp' || (w.path === 'none' && !w.verbForm)) st = markFinite(st)
       return finishWord(st)
+    }
+
+    case 'completes': {
+      const t = a.target
+      if (!st.tokens[t] || t === i) return fail(st, 'Choose another word in the sentence.')
+      if (t < i && !isFiniteVerb(st, t)) return fail(st, 'That word is not a finite verb.')
+      if (t > i) {
+        // Not parsed yet: some reading of it must be finite (or a participle that may join a form of sum).
+        const cands = lex.lookup(surfaceOf(st.tokens[t]))
+        const can = !cands.length || cands.some((c) => !c.analyses.length || c.analyses.some((x) => x.k === 'fin' || x.k === 'imp' || x.k === 'ptc'))
+        if (!can) return fail(st, 'That word cannot be a finite verb.')
+      }
+      return finishWord(withWord(st, i, { completes: t }))
     }
 
     case 'compoundForm': {
@@ -557,6 +596,8 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       const ptcW = st.words[cp.ptc]
       const c = checkCompoundForm(lex, ptcW.entryId!, surfaceOf(st.tokens[cp.ptc]), surfaceOf(st.tokens[cp.sum]), a.form)
       if (!c.ok) return fail(st, c.reason)
+      const cinf = [...incomingLinks(st, cp.ptc), ...incomingLinks(st, cp.sum)].find((l) => l.kind === 'cinf')
+      if (cinf && a.form.k !== 'fin') return fail(st, `${quoted(st, cinf.from)} was linked to this verb as the finite verb it completes, but this is not a finite verb.`)
       st = withWord(st, cp.ptc, { compound: { ...cp, form: a.form } })
       return { ...st, step: 'compoundRole' }
     }
@@ -565,6 +606,7 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       const cp = findCompound(st, i)
       if (!cp?.form) return fail(st, 'No compound verb here.')
       if (a.role.kind !== 'label') return fail(st, 'Give the verb a verb label.')
+      if (a.role.label === 'CINF') return fail(st, 'Label the two words together with a verb label.')
       const c = checkVerbLabel(lex, st.words[cp.ptc].entryId!, cp.form, a.role.label)
       if (!c.ok) return fail(st, c.reason)
       st = withWord(st, cp.ptc, { compound: { ...cp, label: a.role.label } })
@@ -667,8 +709,6 @@ export function findCompound(st: SessionState, i: number): Compound | undefined 
 export function optionsFor(st: SessionState, _lex?: Lexicon): Options {
   const i = activeIndex(st)
   const w = st.words[i]
-  const nounTargets = st.words.map((x, j) => ({ x, j })).filter(({ x, j }) => j < i && isNounLike(x)).map(({ j }) => j)
-  const later = st.tokens.map((_, j) => j).filter((j) => j > i)
   switch (st.step) {
     case 'pos': case 'encliticPos': return { pos: ALL_POS }
     case 'nomForm': {
@@ -678,7 +718,6 @@ export function optionsFor(st: SessionState, _lex?: Lexicon): Options {
     }
     case 'relNG': return { numbers: ALL_NUMBERS, genders: ALL_GENDERS }
     case 'relCase': return { cases: ALL_CASES }
-    case 'antecedent': return { nounTargets }
     case 'verbForm': case 'compoundForm': {
       const all = { persons: ALL_PERSONS, numbers: ALL_NUMBERS, tenses: ALL_TENSES, moods: ALL_MOODS, voices: ALL_VOICES }
       if (st.step !== 'verbForm' || !w.stemType) return all
@@ -694,9 +733,9 @@ export function optionsFor(st: SessionState, _lex?: Lexicon): Options {
       }
     }
     case 'prepCase': return { cases: ['acc', 'abl'] }
-    case 'nomRole': return { labels: w.pos === 'ADV' ? ['ADV'] : NOUN_LABELS, nounTargets, later }
-    case 'verbRole': case 'compoundRole': return { labels: VERB_LABELS }
-    case 'sumUse': return { later }
+    case 'nomRole': return { labels: w.pos === 'ADV' ? ['ADV'] : NOUN_LABELS }
+    case 'verbRole': return { labels: VERB_LABELS }
+    case 'compoundRole': return { labels: VERB_LABELS.filter((l) => l !== 'CINF') }
     default: return {}
   }
 }

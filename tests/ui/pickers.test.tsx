@@ -75,3 +75,20 @@ test('the passive on a perfect active stem is explained on Check', () => {
   const r = submit(st, { step: 'verbForm', form: { k: 'fin', p: '3', n: 'sg', t: 'pf', m: 'ind', v: 'pass' } }, lex())
   expect(r.error).toBe('The perfect active stem does not build the passive.')
 })
+
+test('the CINF screen offers words on both sides and marks the current one', () => {
+  const st = at('potuit fugere nōn', [
+    { step: 'identify', entryId: 'possum-v' }, { step: 'pos', pos: 'V' }, { step: 'personal', ending: 'it' }, { step: 'stem', stem: 'potu' },
+    { step: 'stemType', t: 'pfAct' }, { step: 'verbForm', form: { k: 'fin', p: '3', n: 'sg', t: 'pf', m: 'ind', v: 'act' } },
+    { step: 'verbRole', role: { kind: 'label', label: 'V' } },
+    { step: 'identify', entryId: 'fugio-v' }, { step: 'pos', pos: 'V' }, { step: 'infEnding', ending: 're' }, { step: 'stem', stem: 'fug' },
+    { step: 'stemType', t: 'pres' }, { step: 'verbForm', form: { k: 'inf', t: 'pres', v: 'act' } },
+    { step: 'verbRole', role: { kind: 'label', label: 'CINF' } },
+  ])
+  render(<Workbench st={st} lex={lex()} onAnswer={() => {}} />)
+  expect(screen.getByRole('heading').textContent).toBe('Completes what finite verb?')
+  expect(btn('potuit')).toBeTruthy()
+  expect(btn('nōn')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'fugere' })).toBeNull()
+  expect(document.querySelector('.word-row .here')?.textContent).toBe('fugere')
+})
