@@ -106,12 +106,10 @@ button.tok:hover .word { text-decoration: underline; text-decoration-color: var(
 .slot.current .tok { background: var(--accent-soft); }
 .slot.current .word { font-weight: 600; }
 .slot.reviewing .tok { outline: 2px solid var(--accent); outline-offset: -2px; }
-.slot .blank { display: inline-block; width: 52px; height: 6px; border-radius: 3px; background: var(--line); vertical-align: middle; }
-.slot.hidden { padding-left: 7px; padding-right: 7px; flex-direction: column; }
-.slot.hidden .fn { border-top: 1px solid var(--line); }
-.slot.clause-1 .tok, .slot.clause-1.hidden { background: var(--clause-1); border-radius: 0; }
-.slot.clause-2 .tok, .slot.clause-2.hidden { background: var(--clause-2); border-radius: 0; }
-.slot.clause-3 .tok, .slot.clause-3.hidden { background: var(--clause-3); border-radius: 0; }
+.slot.ahead .word { color: var(--muted); }
+.slot.clause-1 .tok { background: var(--clause-1); border-radius: 0; }
+.slot.clause-2 .tok { background: var(--clause-2); border-radius: 0; }
+.slot.clause-3 .tok { background: var(--clause-3); border-radius: 0; }
 .slot.current[class*='clause-'] .tok { box-shadow: inset 0 -3px 0 var(--accent); }
 .slot.in-pp .word { text-decoration: underline; text-decoration-color: var(--pp); text-decoration-thickness: 2px; text-underline-offset: 6px; }
 .slot.ghost .tok { opacity: 0.4; }

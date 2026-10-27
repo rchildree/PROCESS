@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Lexicon } from '../core/types.ts'
 import { activeIndex, findCompound, isRelative, optionsFor, surfaceOf, tagged, type Answer, type SessionState } from '../core/session.ts'
 import type { LookupMode } from '../core/headword.ts'
@@ -7,7 +8,7 @@ import { ChoiceStep } from './steps/ChoiceStep.tsx'
 import { EndingSelector } from './steps/EndingSelector.tsx'
 import { NomFormPicker, NumGenPicker, VerbFormPicker } from './steps/FormPicker.tsx'
 import { IdentifyStep } from './steps/IdentifyStep.tsx'
-import { RoleStep } from './steps/RoleStep.tsx'
+import { LaterPicker, RoleStep } from './steps/RoleStep.tsx'
 import { StemSelector } from './steps/StemSelector.tsx'
 import { describeAnswer, POS_NAME, segments, STEP_NAME } from './summary.ts'
 
@@ -76,6 +77,19 @@ function EditNotice({ st, onCancel }: { st: SessionState; onCancel?: () => void 
   }
   if (b?.reason) return <div className="notice broken" role="alert">Your earlier answer here no longer fits: {b.reason}</div>
   return <div className="notice">Still carrying your change to <strong>{changed}</strong> through the sentence.</div>
+}
+
+function SumUse({ later, wordAt, onPick }: { later: number[]; wordAt: (i: number) => string; onPick: (t: number | null) => void }) {
+  const [picking, setPicking] = useState(false)
+  if (picking) {
+    return <LaterPicker heading="Which later word is the participle?" later={later} wordAt={wordAt} onPick={onPick} onBack={() => setPicking(false)} />
+  }
+  return (
+    <div className="choices">
+      <button type="button" onClick={() => onPick(null)}>on its own</button>
+      <button type="button" onClick={() => setPicking(true)}>part of a verb with…</button>
+    </div>
+  )
 }
 
 const POS_OPTIONS = (Object.keys(POS_NAME) as UiPos[]).map((p) => ({ value: p, label: POS_NAME[p] }))
@@ -168,7 +182,7 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
     }
     case 'verbRole':
       title = 'Label the verb.'
-      body = <RoleStep kind="verb" isSum={w.entryId === 'sum-v'} options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'verbRole', role })} />
+      body = <RoleStep kind="verb" options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'verbRole', role })} />
       break
     case 'compoundForm':
       title = cp ? `Parse “${wordAt(cp.ptc)} ${wordAt(cp.sum)}” together.` : 'Parse the compound verb.'
@@ -186,16 +200,9 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
       title = 'Coordinating or subordinating?'
       body = <ChoiceStep options={[{ value: '+', label: '+', hint: 'coordinating' }, { value: '↓', label: '↓', hint: 'subordinating' }]} onPick={(t) => onAnswer({ step: 'conjType', t })} />
       break
-    case 'linkPending':
-      title = 'Does an earlier word go with this noun?'
-      body = (
-        <div className="choices">
-          {st.pendingLinkCandidates.map((t) => (
-            <button key={t} type="button" onClick={() => onAnswer({ step: 'linkPending', target: t })}><em>{wordAt(t)}</em> goes with it</button>
-          ))}
-          <button type="button" onClick={() => onAnswer({ step: 'linkPending', target: null })}>No</button>
-        </div>
-      )
+    case 'sumUse':
+      title = 'Is this form of sum a verb on its own?'
+      body = <SumUse later={options.later ?? []} wordAt={wordAt} onPick={(target) => onAnswer({ step: 'sumUse', target })} />
       break
     case 'clauseBoundary':
       title = 'Does the ↓ clause end after this word?'
@@ -209,14 +216,6 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
       title = `“-${tok.enclitic}”: coordinating or subordinating?`
       body = <ChoiceStep options={[{ value: '+', label: '+', hint: 'coordinating' }, { value: '↓', label: '↓', hint: 'subordinating' }]} onPick={(t) => onAnswer({ step: 'encliticConj', t })} />
       break
-    case 'resolvePending': {
-      const verb = w.role?.kind === 'aux'
-      title = `The sentence is over. What does “${surface}” do?`
-      body = verb
-        ? <RoleStep kind="verb" resolving options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'resolvePending', role })} />
-        : <RoleStep kind={w.pos === 'PRO' ? 'pronoun' : 'adjective'} resolving options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'resolvePending', role })} />
-      break
-    }
     case 'done':
       title = 'Sentence complete.'
       body = onNext ? <button type="button" className="primary" onClick={onNext}>Next sentence →</button> : <p>That was the last sentence in this set.</p>

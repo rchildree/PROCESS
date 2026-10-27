@@ -24,7 +24,6 @@ export function labelOf(st: SessionState, i: number, words: WordState[] = st.wor
   if (r) {
     switch (r.kind) {
       case 'label': case 'substantive': case 'predicate': label = r.label; break
-      case 'pendingNoun': label = '…'; break
       case 'modifies': label = ''; break
       case 'verbPart': case 'aux': {
         const cp = findCompound({ ...st, words }, i)
@@ -65,7 +64,7 @@ export function detailsOf(st: SessionState, i: number, words: WordState[] = st.w
   if (r?.kind === 'modifies') lines.push(['→ ', la(r.target)])
   if (r?.kind === 'substantive') lines.push(['subst.'])
   if (r?.kind === 'predicate') lines.push(['pred.'])
-  if ((r?.kind === 'verbPart' || r?.kind === 'aux') && r.target !== undefined) lines.push(['+ ', la(r.target)])
+  if (r?.kind === 'verbPart' || r?.kind === 'aux') lines.push(['+ ', la(r.target)])
   if (w.compound?.form) lines.push([verbText(w.compound.form)])
   if (w.enclitic?.done) lines.push([{ la: `-${st.tokens[i].enclitic}` }])
   return lines
@@ -77,19 +76,17 @@ export const STEP_NAME: Record<StepId, string> = {
   identify: 'Dictionary entry', pos: 'Part of speech', ending: 'Ending', nomForm: 'Case, number, gender', nomRole: 'Function',
   personal: 'Personal ending', stem: 'Stem', stemType: 'Stem type', infEnding: 'Ending', verbForm: 'Verb form', verbRole: 'Function',
   relNG: 'Number, gender', antecedent: 'Antecedent', relCase: 'Case', compoundForm: 'Compound verb form', compoundRole: 'Compound verb label',
-  prepCase: 'Case it takes', conjType: 'Conjunction type', linkPending: 'Earlier word joined', clauseBoundary: 'Clause end',
-  encliticPos: 'Enclitic part of speech', encliticConj: 'Enclitic type', resolvePending: 'Final decision', done: '',
+  prepCase: 'Case it takes', conjType: 'Conjunction type', clauseBoundary: 'Clause end',
+  encliticPos: 'Enclitic part of speech', encliticConj: 'Enclitic type', sumUse: 'On its own or part of a verb', done: '',
 }
 
 function roleText(r: Role, word: (j: number) => string): string {
   switch (r.kind) {
     case 'label': return r.label
     case 'modifies': return `modifies ${word(r.target)}`
-    case 'pendingNoun': return 'its noun comes later'
     case 'predicate': return `predicate ${r.label}`
     case 'substantive': return `used as a noun: ${r.label}`
-    case 'verbPart': return r.target === undefined ? 'part of a compound verb (sum later)' : `with ${word(r.target)}`
-    case 'aux': return r.target === undefined ? 'auxiliary (participle later)' : `with ${word(r.target)}`
+    case 'verbPart': case 'aux': return `part of a verb with ${word(r.target)}`
   }
 }
 
@@ -106,8 +103,8 @@ export function describeAnswer(a: Answer, st: SessionState, lex: Lexicon): strin
     case 'relCase': case 'prepCase': return a.c
     case 'antecedent': return a.target === null ? 'none stated' : word(a.target)
     case 'verbForm': case 'compoundForm': return verbText(a.form)
-    case 'nomRole': case 'verbRole': case 'compoundRole': case 'resolvePending': return roleText(a.role, word)
-    case 'linkPending': return a.target === null ? 'none' : word(a.target)
+    case 'nomRole': case 'verbRole': case 'compoundRole': return roleText(a.role, word)
+    case 'sumUse': return a.target === null ? 'on its own' : `part of a verb with ${word(a.target)}`
     case 'conjType': case 'encliticConj': return a.t === '+' ? '+ coordinating' : '↓ subordinating'
     case 'clauseBoundary': return a.ends ? 'clause ends here' : 'clause continues'
   }

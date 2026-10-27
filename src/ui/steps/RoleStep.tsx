@@ -6,8 +6,6 @@ interface Props {
   /** 'noun' = label only; 'adjective' = adjective roles; 'pronoun' = both; 'adverb'; 'verb'. */
   kind: 'noun' | 'adjective' | 'pronoun' | 'adverb' | 'verb'
   participle?: boolean
-  isSum?: boolean
-  resolving?: boolean
   options: Options
   wordAt: (i: number) => string
   onRole: (r: Role) => void
@@ -28,28 +26,36 @@ function Labels({ labels, onPick }: { labels: Label[]; onPick: (l: Label) => voi
   )
 }
 
-export function RoleStep({ kind, participle, isSum, resolving, options, wordAt, onRole }: Props) {
-  const [sub, setSub] = useState<'substantive' | null>(null)
+/** The words after the current one, as buttons: for linking to a word not reached yet. */
+export function LaterPicker({ heading, later, wordAt, onPick, onBack }: {
+  heading: string; later: number[]; wordAt: (i: number) => string; onPick: (i: number) => void; onBack: () => void
+}) {
+  return (
+    <div className="roles">
+      <h4>{heading}</h4>
+      <div className="choices">
+        {later.map((t) => <button key={t} type="button" onClick={() => onPick(t)}><em>{wordAt(t)}</em></button>)}
+        {later.length === 0 && <span className="muted">This is the last word.</span>}
+      </div>
+      <button type="button" className="link" onClick={onBack}>← back</button>
+    </div>
+  )
+}
+
+export function RoleStep({ kind, participle, options, wordAt, onRole }: Props) {
+  const [sub, setSub] = useState<'substantive' | 'nounLater' | 'verbLater' | null>(null)
 
   if (kind === 'adverb') return <Labels labels={['ADV']} onPick={(label) => onRole({ kind: 'label', label })} />
 
-  if (kind === 'verb') {
-    return (
-      <div className="roles">
-        <Labels labels={options.labels ?? []} onPick={(label) => onRole({ kind: 'label', label })} />
-        {isSum && !resolving && (
-          <section>
-            <h4>Auxiliary: part of a compound verb with a participle</h4>
-            <div className="choices">
-              {(options.pendingTargets ?? []).map((t) => (
-                <button key={t} type="button" onClick={() => onRole({ kind: 'aux', target: t })}>goes with <em>{wordAt(t)}</em></button>
-              ))}
-              <button type="button" onClick={() => onRole({ kind: 'aux' })}>participle comes later</button>
-            </div>
-          </section>
-        )}
-      </div>
-    )
+  if (kind === 'verb') return <Labels labels={options.labels ?? []} onPick={(label) => onRole({ kind: 'label', label })} />
+
+  if (sub === 'nounLater') {
+    return <LaterPicker heading="Which later word is its noun?" later={options.later ?? []} wordAt={wordAt}
+      onPick={(target) => onRole({ kind: 'modifies', target })} onBack={() => setSub(null)} />
+  }
+  if (sub === 'verbLater') {
+    return <LaterPicker heading="Which later word is the form of sum?" later={options.later ?? []} wordAt={wordAt}
+      onPick={(target) => onRole({ kind: 'verbPart', target })} onBack={() => setSub(null)} />
   }
 
   if (kind === 'noun') return <Labels labels={NOUN_LABELS} onPick={(label) => onRole({ kind: 'label', label })} />
@@ -78,8 +84,7 @@ export function RoleStep({ kind, participle, isSum, resolving, options, wordAt, 
           {(options.nounTargets ?? []).map((t) => (
             <button key={t} type="button" onClick={() => onRole({ kind: 'modifies', target: t })}><em>{wordAt(t)}</em></button>
           ))}
-          {!resolving && <button type="button" onClick={() => onRole({ kind: 'pendingNoun' })}>its noun comes later</button>}
-          {(options.nounTargets ?? []).length === 0 && resolving && <span className="muted">No nouns to choose.</span>}
+          <button type="button" onClick={() => setSub('nounLater')}>its noun comes later</button>
         </div>
       </section>
       {kind === 'adjective' && (
@@ -92,14 +97,11 @@ export function RoleStep({ kind, participle, isSum, resolving, options, wordAt, 
           </div>
         </section>
       )}
-      {participle && !resolving && (
+      {participle && (
         <section>
-          <h4>Part of a compound verb with a form of sum</h4>
+          <h4>Part of a verb with a form of sum</h4>
           <div className="choices">
-            {(options.pendingTargets ?? []).map((t) => (
-              <button key={t} type="button" onClick={() => onRole({ kind: 'verbPart', target: t })}>goes with <em>{wordAt(t)}</em></button>
-            ))}
-            <button type="button" onClick={() => onRole({ kind: 'verbPart' })}>form of sum comes later</button>
+            <button type="button" onClick={() => setSub('verbLater')}>part of a verb with…</button>
           </div>
         </section>
       )}

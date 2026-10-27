@@ -17,7 +17,8 @@ interface Arc { d: string; kind: Link['kind']; key: string; open?: boolean }
 function linksOf(words: WordState[]): Link[] {
   const out: Link[] = []
   words.forEach((w, i) => {
-    if (w.role?.kind === 'modifies') out.push({ from: i, to: w.role.target, kind: 'mod' })
+    // A link to a later word is drawn once that word is finished and the link has been checked.
+    if (w.role?.kind === 'modifies' && (w.role.target < i || words[w.role.target]?.done)) out.push({ from: i, to: w.role.target, kind: 'mod' })
     if (w.antecedent !== undefined && w.antecedent !== null) out.push({ from: i, to: w.antecedent, kind: 'ante' })
   })
   return out
@@ -95,30 +96,22 @@ export function SentenceView({ st, reviewable, reviewing = null, onPickWord }: P
           const ghost = isGhost(i)
           const words = ghost ? ed!.ghost : st.words
           const w = words[i]
-          const revealed = i <= st.current || finished || st.resolving !== null || ghost
+          const ahead = i > st.current && !finished && !ghost && !w.done
           const inPP = st.openPP && i >= st.openPP.prep && i <= st.current && !finished
           const broken = ed?.broken && ed.broken.word === i && ed.broken.word !== ed.word
           const cls = [
             'slot',
             i === active && !finished ? 'current' : '',
-            revealed ? '' : 'hidden',
+            ahead ? 'ahead' : '',
             w.clauseDepth ? `clause-${Math.min(w.clauseDepth, 3)}` : '',
             inPP ? 'in-pp' : '',
             ghost ? 'ghost' : '',
             broken ? 'broken' : '',
             reviewing === i ? 'reviewing' : '',
           ].filter(Boolean).join(' ')
-          if (!revealed) {
-            return (
-              <li key={i} className={cls} aria-label="hidden word">
-                <span className="word"><span className="blank" /></span>
-                <span className="fn" />
-              </li>
-            )
-          }
           const showParse = ghost || w.done || finished || (i !== active && !!w.role)
           const label = showParse ? labelOf(st, i, words) : ''
-          const canOpen = !!onPickWord && !!reviewable?.has(i)
+          const canOpen = !ahead && !!onPickWord && !!reviewable?.has(i)
           const inner = (
             <>
               <span className="word" ref={(el) => { wordEls.current[i] = el }}>{t.punctBefore}{t.surface}{t.punctAfter}</span>
