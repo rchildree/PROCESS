@@ -60,7 +60,8 @@ export { PickWord }
 export function RoleStep({ kind, participle, options, wordAt, here, count, onRole }: Props) {
   const [sub, setSub] = useState<'substantive' | 'sum' | null>(null)
 
-  if (kind === 'adverb') return <Labels labels={['ADV']} onPick={(label) => onRole({ kind: 'label', label })} />
+  // An adverb only ever takes ADV: the label is applied, the student just moves on.
+  if (kind === 'adverb') return <button type="button" className="primary" autoFocus onClick={() => onRole({ kind: 'label', label: 'ADV' })}>Continue</button>
 
   if (kind === 'verb') return <Labels labels={options.labels ?? []} onPick={(label) => onRole({ kind: 'label', label })} />
 

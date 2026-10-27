@@ -68,10 +68,10 @@ test('coordinated objects stay in the prepositional phrase', () => {
   const st = play('ex agrō et aquā', [
     { step: 'identify', entryId: 'e-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
     { step: 'identify', entryId: 'ager-n' }, { step: 'pos', pos: 'N' }, { step: 'ending', ending: 'ō' },
-    { step: 'nomForm', form: { c: 'abl', n: 'sg', g: 'm' } }, { step: 'nomRole', role: { kind: 'label', label: 'PP' } },
+    { step: 'nomForm', form: { c: 'abl', n: 'sg', g: 'm' } }, { step: 'nomRole', role: { kind: 'label', label: 'PP' } }, { step: 'ppPrep', target: 0 },
     { step: 'identify', entryId: 'et-conj' }, { step: 'pos', pos: 'CONJ' }, { step: 'conjType', t: '+' },
     { step: 'identify', entryId: 'aqua-n' }, { step: 'pos', pos: 'N' }, { step: 'ending', ending: 'ā' },
-    { step: 'nomForm', form: { c: 'abl', n: 'sg', g: 'f' } }, { step: 'nomRole', role: { kind: 'label', label: 'PP' } },
+    { step: 'nomForm', form: { c: 'abl', n: 'sg', g: 'f' } }, { step: 'nomRole', role: { kind: 'label', label: 'PP' } }, { step: 'ppPrep', target: 0 },
   ])
   expect(st.step).toBe('done')
 })

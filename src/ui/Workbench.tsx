@@ -136,7 +136,7 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
         break
       }
       const kind = w.pos === 'N' ? 'noun' : w.pos === 'ADV' ? 'adverb' : w.pos === 'PRO' ? 'pronoun' : 'adjective'
-      title = kind === 'noun' ? 'What is its function?' : kind === 'adverb' ? 'Label it.' : 'What does it do in the sentence?'
+      title = kind === 'noun' ? 'What is its function?' : kind === 'adverb' ? 'ADV label applied.' : 'What does it do in the sentence?'
       body = <RoleStep {...row} kind={kind} participle={isPtc} options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
       break
     }
@@ -210,6 +210,10 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
     case 'completes':
       title = 'Completes what finite verb?'
       body = <WordRow {...row} onPick={(target) => onAnswer({ step: 'completes', target })} />
+      break
+    case 'ppPrep':
+      title = 'With which preposition?'
+      body = <WordRow {...row} onPick={(target) => onAnswer({ step: 'ppPrep', target })} />
       break
     case 'clauseBoundary':
       title = 'Does the ↓ clause end after this word?'

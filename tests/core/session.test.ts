@@ -40,7 +40,7 @@ const L10_2_ANSWERS: Answer[] = [
   ...noun('puer-n', 'um', nf('acc', 'sg', 'm'), 'O'),
   ...adjStart('magnus-adj', 'ā', nf('abl', 'sg', 'f')), { step: 'nomRole', role: { kind: 'modifies', target: 5 } },
   { step: 'identify', entryId: 'cum-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
-  ...noun('cura-n', 'ā', nf('abl', 'sg', 'f'), 'PP'),
+  ...noun('cura-n', 'ā', nf('abl', 'sg', 'f'), 'PP'), { step: 'ppPrep', target: 4 },
   ...verb('curo-v', 'it', 'cūrāv', 'pfAct', fin('pf', 'act', '3', 'sg')), { step: 'verbRole', role: { kind: 'label', label: 'V' } },
 ]
 
@@ -59,9 +59,9 @@ describe('full sentences', () => {
       ...adjStart('is-pron', 'ō', nf('abl', 'sg', 'n'), 'PRO'), { step: 'nomRole', role: { kind: 'modifies', target: 2 } },
       ...noun('tempus-n', 'e', nf('abl', 'sg', 'n'), 'ADV'),
       { step: 'identify', entryId: 'a-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
-      ...noun('caesar-n', 'e', nf('abl', 'sg', 'm'), 'PP'),
+      ...noun('caesar-n', 'e', nf('abl', 'sg', 'm'), 'PP'), { step: 'ppPrep', target: 3 },
       { step: 'identify', entryId: 'in-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
-      ...noun('ager-n', 'ō', nf('abl', 'sg', 'm'), 'PP'),
+      ...noun('ager-n', 'ō', nf('abl', 'sg', 'm'), 'PP'), { step: 'ppPrep', target: 5 },
       { step: 'identify', entryId: 'instruo-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'a' },
       { step: 'stem', stem: 'īnstrūct' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: nf('nom', 'sg', 'f') }, { step: 'nomRole', role: { kind: 'verbPart', target: 8 } },
       { step: 'identify', entryId: 'sum-v' }, { step: 'pos', pos: 'V' },
@@ -250,5 +250,40 @@ describe('review fixes', () => {
       ...ptc,
     ])
     expect(submit(st, { step: 'nomRole', role: { kind: 'verbPart', target: 3 } }, lex()).error).toMatch(/already/)
+  })
+})
+
+describe('the preposition a PP goes with', () => {
+  const upTo: Answer[] = [
+    ...noun('medicus-n', 'us', nf('nom', 'sg', 'm'), 'S'),
+    ...adjStart('timidus-adj', 'um', nf('acc', 'sg', 'm')), { step: 'nomRole', role: { kind: 'modifies', target: 2 } },
+    ...noun('puer-n', 'um', nf('acc', 'sg', 'm'), 'O'),
+    ...adjStart('magnus-adj', 'ā', nf('abl', 'sg', 'f')), { step: 'nomRole', role: { kind: 'modifies', target: 5 } },
+    { step: 'identify', entryId: 'cum-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
+    ...noun('cura-n', 'ā', nf('abl', 'sg', 'f'), 'PP'),
+  ]
+
+  test('labeling a word PP asks for its preposition', () => {
+    const st = play(L10_2, upTo)
+    expect(st.step).toBe('ppPrep')
+    const done = play(L10_2, [{ step: 'ppPrep', target: 4 }], st)
+    expect(done.words[5].ppWith).toBe(4)
+    expect(done.openPP).toBeNull()
+  })
+
+  test('a word that is not a preposition is refused', () => {
+    const st = play(L10_2, upTo)
+    expect(submit(st, { step: 'ppPrep', target: 3 }, lex()).error).toBe('That word is not a preposition.')
+    expect(submit(st, { step: 'ppPrep', target: 6 }, lex()).error).toBe('That word is not a preposition.')
+  })
+
+  test('another preposition is refused', () => {
+    const st = play('ā Caesare in agrō', [
+      { step: 'identify', entryId: 'a-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
+      ...noun('caesar-n', 'e', nf('abl', 'sg', 'm'), 'PP'), { step: 'ppPrep', target: 0 },
+      { step: 'identify', entryId: 'in-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
+      ...noun('ager-n', 'ō', nf('abl', 'sg', 'm'), 'PP'),
+    ])
+    expect(submit(st, { step: 'ppPrep', target: 0 }, lex()).error).toBe('This word does not go with that preposition.')
   })
 })

@@ -13,7 +13,7 @@ export type StepId =
   | 'identify' | 'pos' | 'ending' | 'nomForm' | 'nomRole' | 'personal' | 'stem' | 'stemType' | 'infEnding' | 'verbForm' | 'verbRole'
   | 'relNG' | 'antecedent' | 'relCase'
   | 'compoundForm' | 'compoundRole' | 'prepCase' | 'conjType' | 'clauseBoundary' | 'encliticPos'
-  | 'encliticConj' | 'sumUse' | 'completes' | 'done'
+  | 'encliticConj' | 'sumUse' | 'completes' | 'ppPrep' | 'done'
 
 export type Role =
   | { kind: 'label'; label: Label }
@@ -43,6 +43,8 @@ export type Answer =
   | { step: 'sumUse'; target: number | null }
   /** A complementary infinitive: the finite verb it completes. */
   | { step: 'completes'; target: number }
+  /** A word labeled PP: the preposition it goes with. */
+  | { step: 'ppPrep'; target: number }
 
 export interface Compound { ptc: number; sum: number; form?: VerbForm; label?: Label }
 
@@ -69,6 +71,8 @@ export interface WordState {
   compound?: Compound
   /** A complementary infinitive (CINF): the finite verb it completes. */
   completes?: number
+  /** A word labeled PP: the preposition it goes with. */
+  ppWith?: number
   enclitic?: { pos?: UiPos; conjType?: '+' | '↓'; done: boolean }
   clauseDepth: number
   done: boolean
@@ -267,6 +271,16 @@ function closePPIfObject(st: SessionState, i: number): SessionState {
   const label = w.role?.kind === 'label' || w.role?.kind === 'substantive' ? w.role.label : null
   if (label !== 'PP' || !st.openPP) return st
   return { ...st, openPP: null, lastPP: { prep: st.openPP.prep, c: st.openPP.c, closer: i } }
+}
+
+/** A nominal word's role is settled: close its prepositional phrase, open a relative clause, finish the word. */
+function afterNomRole(st: SessionState, i: number): SessionState {
+  st = closePPIfObject(st, i)
+  if (isRelative(st.words[i])) {
+    const clauses = [...st.clauses, { conj: i, hasFiniteVerb: false }]
+    st = withWord({ ...st, clauses }, i, { clauseDepth: clauses.length })
+  }
+  return finishWord(st)
 }
 
 // ---------- role checks ----------
@@ -537,12 +551,17 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       if (!c.ok) return fail(st, c.reason)
       st = withWord(st, i, { role: a.role })
       if (a.role.kind === 'verbPart') return finishWord(withWord(st, i, { compound: { ptc: i, sum: a.role.target } }))
-      st = closePPIfObject(st, i)
-      if (isRelative(st.words[i])) {
-        const clauses = [...st.clauses, { conj: i, hasFiniteVerb: false }]
-        st = withWord({ ...st, clauses }, i, { clauseDepth: clauses.length })
-      }
-      return finishWord(st)
+      if ((a.role.kind === 'label' || a.role.kind === 'substantive') && a.role.label === 'PP') return { ...st, step: 'ppPrep' }
+      return afterNomRole(st, i)
+    }
+
+    case 'ppPrep': {
+      const t = a.target
+      const tw = st.words[t]
+      if (!st.tokens[t] || t === i) return fail(st, 'Choose another word in the sentence.')
+      if (tw?.pos !== 'PREP') return fail(st, 'That word is not a preposition.')
+      if (st.openPP && st.openPP.prep !== t) return fail(st, 'This word does not go with that preposition.')
+      return afterNomRole(withWord(st, i, { ppWith: t }), i)
     }
 
     case 'personal': {

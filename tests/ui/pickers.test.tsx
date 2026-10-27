@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, test } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Workbench } from '../../src/ui/Workbench.tsx'
 import { startSession, submit, type Answer } from '../../src/core/session.ts'
 import { tokenize } from '../../src/core/sets.ts'
@@ -56,6 +56,10 @@ test('a noun an earlier adjective was linked to starts with that adjective\'s ca
   expect(btn('F.').getAttribute('aria-pressed')).toBe('true')
   expect(screen.getByText(/preselected based on rules of agreement with/)).toBeTruthy()
   expect(btn('Check').disabled).toBe(false)
+  expect(btn('Dat.').className).toContain('preset')
+  fireEvent.click(btn('Dat.'))
+  expect(btn('Dat.').className).not.toContain('preset')
+  expect(btn('Sg.').className).toContain('preset')
 })
 
 test('a greyed-out tense can still be picked, and Check explains why it is wrong', async () => {
@@ -91,4 +95,14 @@ test('the CINF screen offers words on both sides and marks the current one', () 
   expect(btn('nōn')).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'fugere' })).toBeNull()
   expect(document.querySelector('.word-row .here')?.textContent).toBe('fugere')
+})
+
+test('an adverb shows its label as applied, with Continue', async () => {
+  const { fireEvent } = await import('@testing-library/react')
+  const st = at('nōn', [{ step: 'identify', entryId: 'non-adv' }, { step: 'pos', pos: 'ADV' }])
+  let sent: Answer | null = null
+  render(<Workbench st={st} lex={lex()} onAnswer={(a) => { sent = a }} />)
+  expect(screen.getByRole('heading').textContent).toBe('ADV label applied.')
+  fireEvent.click(btn('Continue'))
+  expect(sent).toEqual({ step: 'nomRole', role: { kind: 'label', label: 'ADV' } })
 })

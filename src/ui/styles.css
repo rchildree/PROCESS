@@ -14,6 +14,8 @@
   --clause-3: #e6f3ec;
   --pp: #b07a1d;
   --ante: #2a5d8f;
+  --preset: #2f6f73;
+  --preset-soft: #e3f0f0;
   --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
   --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light;
@@ -36,6 +38,8 @@
     --clause-3: #1e3127;
     --pp: #e0b25a;
     --ante: #8fb8e6;
+    --preset: #7cc4c8;
+    --preset-soft: #1d3233;
     color-scheme: dark;
   }
 }
@@ -211,7 +215,8 @@ button.link, a.link { background: none; border: none; color: var(--muted); text-
 }
 .ending-note { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; font-size: 14px; }
 .ending-note .ending-mark { font-family: var(--serif); font-size: 18px; font-weight: 600; padding: 1px 8px; border-radius: 4px; background: var(--accent-soft); }
-.notice.preset { margin: 0; }
+.notice.preset { margin: 0; background: var(--preset-soft); border-color: var(--preset); }
+.group button.on.preset { background: var(--preset); border-color: var(--preset); color: var(--panel); }
 .group button.off:not(.on) { opacity: 0.35; }
 .group button.off.on { opacity: 0.6; }
 /* Picking a linked word: the sentence in order, the current word marked by a small triangle beneath it. */

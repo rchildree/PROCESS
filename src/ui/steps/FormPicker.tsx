@@ -9,8 +9,10 @@ const TENSE_LABEL: Record<string, string> = { pres: 'Present', impf: 'Imperfect'
 const MOOD_LABEL: Record<string, string> = { ind: 'Indicative', subj: 'Subjunctive', imp: 'Imperative' }
 const VOICE_LABEL: Record<string, string> = { act: 'Active', pass: 'Passive' }
 
-function Group<T extends string>({ title, values, labels, value, onChange, off = [], why }: {
+function Group<T extends string>({ title, values, labels, value, onChange, off = [], why, preset = false }: {
   title: string; values: T[]; labels: Record<string, string>; value?: T; onChange: (v: T) => void
+  /** The selected value was filled in for the student, not chosen: shown in its own colour until they click. */
+  preset?: boolean
   /** Values shown greyed out (still clickable), with `why` as their tooltip. */
   off?: string[]; why?: string
 }) {
@@ -21,7 +23,7 @@ function Group<T extends string>({ title, values, labels, value, onChange, off =
         const dis = off.includes(v)
         return (
           // Greyed, but still clickable: Check then explains why it does not fit the stem.
-          <button key={v} type="button" className={[value === v ? 'on' : '', dis ? 'off' : ''].join(' ').trim() || undefined}
+          <button key={v} type="button" className={[value === v ? 'on' : '', value === v && preset ? 'preset' : '', dis ? 'off' : ''].filter(Boolean).join(' ') || undefined}
             aria-pressed={value === v} title={dis ? why : undefined} onClick={() => onChange(v)}>{labels[v] ?? v}</button>
         )
       })}
@@ -50,6 +52,9 @@ export function NomFormPicker({ options, ending, agreeWord, onSubmit }: {
   const [c, setC] = useState<NomForm['c'] | undefined>(start?.c)
   const [n, setN] = useState<NomForm['n'] | undefined>(start?.n)
   const [g, setG] = useState<NomForm['g'] | undefined>(start?.g)
+  // Which groups still hold the preselected value the student has not touched.
+  const [untouched, setUntouched] = useState({ c: !!start, n: !!start, g: !!start })
+  const touch = <T,>(key: 'c' | 'n' | 'g', set: (v: T) => void) => (v: T) => { set(v); setUntouched((u) => ({ ...u, [key]: false })) }
   const ready = c && n && g
   return (
     <div className="form-picker">
@@ -59,9 +64,9 @@ export function NomFormPicker({ options, ending, agreeWord, onSubmit }: {
           Case, number, and gender preselected based on rules of agreement with <em>{agreeWord}</em>. Verify that the information is correct.
         </p>
       )}
-      <Group title="Case" values={options.cases ?? []} labels={CASE_LABEL} value={c} onChange={setC} />
-      <Group title="Number" values={options.numbers ?? []} labels={NUM_LABEL} value={n} onChange={setN} />
-      <Group title="Gender" values={options.genders ?? []} labels={GEN_LABEL} value={g} onChange={setG} />
+      <Group title="Case" values={options.cases ?? []} labels={CASE_LABEL} value={c} onChange={touch('c', setC)} preset={untouched.c} />
+      <Group title="Number" values={options.numbers ?? []} labels={NUM_LABEL} value={n} onChange={touch('n', setN)} preset={untouched.n} />
+      <Group title="Gender" values={options.genders ?? []} labels={GEN_LABEL} value={g} onChange={touch('g', setG)} preset={untouched.g} />
       <button type="button" className="primary" disabled={!ready} onClick={() => ready && onSubmit({ c, n, g })}>Check</button>
     </div>
   )
