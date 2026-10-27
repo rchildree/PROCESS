@@ -139,3 +139,32 @@ describe('forward links and changes', () => {
     expect(ed.editing?.broken?.reason).toMatch(/case/)
   })
 })
+
+describe('verb links and changes', () => {
+  const nf = (c: any, n: any, g: any) => ({ c, n, g })
+  const ptc: Answer[] = [
+    { step: 'identify', entryId: 'appello-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'us' },
+    { step: 'stem', stem: 'appellāt' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: nf('nom', 'sg', 'm') },
+  ]
+  const together: Answer[] = [
+    { step: 'compoundForm', form: { k: 'fin', t: 'pf', m: 'ind', v: 'pass', p: '3', n: 'sg' } }, { step: 'compoundRole', role: { kind: 'label', label: 'PV' } },
+  ]
+
+  test('participle first: unlinking the participle sends est to its own question', () => {
+    const st = play('appellātus est', [...ptc, { step: 'nomRole', role: { kind: 'verbPart', target: 1 } }, { step: 'identify', entryId: 'sum-v' }, { step: 'pos', pos: 'V' }, ...together])
+    expect(st.step).toBe('done')
+    let ed = startEdit(st, 6, lex())
+    ed = submit(ed, { step: 'nomRole', role: { kind: 'predicate', label: 'SC' } }, lex())
+    expect(ed.current).toBe(1)
+    expect(ed.step).toBe('sumUse')
+  })
+
+  test('sum first: making est a verb on its own asks for its personal ending', () => {
+    const st = play('est appellātus', [{ step: 'identify', entryId: 'sum-v' }, { step: 'pos', pos: 'V' }, { step: 'sumUse', target: 1 }, ...ptc, ...together])
+    expect(st.step).toBe('done')
+    let ed = startEdit(st, 2, lex())
+    ed = submit(ed, { step: 'sumUse', target: null }, lex())
+    expect(ed.current).toBe(0)
+    expect(ed.step).toBe('personal')
+  })
+})

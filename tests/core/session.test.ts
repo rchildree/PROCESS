@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { lex } from '../helpers/lex.ts'
 import { tokenize } from '../../src/core/sets.ts'
 import { replay, startSession, submit, type Answer, type SessionState } from '../../src/core/session.ts'
+import { withGlosses } from '../../src/core/lexicon.ts'
 import type { NomForm, VerbForm } from '../../src/core/checks.ts'
 import type { StemType } from '../../src/core/stems.ts'
 
@@ -220,5 +221,34 @@ describe('two-word verbs', () => {
     ])
     expect(st.step).toBe('clauseBoundary')
     expect(submit(st, { step: 'clauseBoundary', ends: true }, lex()).error).toBeNull()
+  })
+})
+
+describe('review fixes', () => {
+  test('an old save with "its noun comes later" stops replaying there instead of crashing', () => {
+    const old = [...adjStart('magnus-adj', 'ae', nf('nom', 'pl', 'f')), { step: 'nomRole', role: { kind: 'pendingNoun' } } as unknown as Answer]
+    const st = replay(toks('magnae puellae'), old, lex())
+    expect(st.step).toBe('nomRole')
+    expect(st.current).toBe(0)
+  })
+
+  test('an adjective can link forward to a glossed noun', () => {
+    const g = withGlosses(lex(), [{ lemma: 'Xerxēs', dict: 'Xerxēs, -is m.', definition: 'Xerxes', pos: 'n' }])
+    let st = startSession(tokenize('magnus Xerxēs', (w) => g.lookup(w).length > 0))
+    for (const a of adjStart('magnus-adj', 'us', nf('nom', 'sg', 'm'))) st = submit(st, a, g)
+    expect(submit(st, { step: 'nomRole', role: { kind: 'modifies', target: 1 } }, g).error).toBeNull()
+  })
+
+  test('two participles cannot share one form of sum', () => {
+    const ptc: Answer[] = [
+      { step: 'identify', entryId: 'appello-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'us' },
+      { step: 'stem', stem: 'appellāt' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: nf('nom', 'sg', 'm') },
+    ]
+    const st = play('appellātus et appellātus est', [
+      ...ptc, { step: 'nomRole', role: { kind: 'verbPart', target: 3 } },
+      { step: 'identify', entryId: 'et-conj' }, { step: 'pos', pos: 'CONJ' }, { step: 'conjType', t: '+' },
+      ...ptc,
+    ])
+    expect(submit(st, { step: 'nomRole', role: { kind: 'verbPart', target: 3 } }, lex()).error).toMatch(/already/)
   })
 })

@@ -276,7 +276,8 @@ function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon)
       if (role.target > i) {
         // Not parsed yet: some reading of it must be able to agree.
         const cands = lex.lookup(surfaceOf(st.tokens[role.target]))
-        if (!form || !cands.length) return { ok: true }
+        // Glossed words carry no forms to check against: the check when the noun finishes still runs.
+        if (!form || !cands.length || cands.some((c) => !c.analyses.length)) return { ok: true }
         const can = cands.some((c) => c.analyses.some((a) => a.c === form.c && a.n === form.n && a.g === form.g))
         return can ? { ok: true } : no('That word cannot agree with this adjective.')
       }
@@ -287,11 +288,15 @@ function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon)
       const ptc = w.entryId ? analysesFor(lex, w.entryId, surfaceOf(st.tokens[i])).some((a) => a.k === 'ptc') : false
       if (!ptc) return no('Only a participle can be part of a verb.')
       if (!st.tokens[role.target] || role.target <= i) return no('Choose a later word.')
+      if (incomingLinks(st, role.target).some((l) => l.kind !== 'noun')) return no('Another word is already part of a verb with that word.')
       return compoundForms(lex, w.entryId!, surfaceOf(st.tokens[i]), surfaceOf(st.tokens[role.target])).length
         ? { ok: true } : no('These two words do not make one verb form.')
     }
     case 'aux':
       return no('Only a form of sum can be an auxiliary.')
+    default:
+      // Roles from older saves that no longer exist.
+      return no('Choose what this word does.')
   }
 }
 
