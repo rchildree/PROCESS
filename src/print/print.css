@@ -42,7 +42,7 @@
 .ws-page .slot { padding-top: 14px; }
 .ws-page .slot .word { font-size: 9pt; line-height: 16px; height: 16px; }
 .ws-page .slot .tok { padding: 0 4px 2px; min-width: 16px; }
-.ws-page .slot .fn { font-size: 7pt; height: 12px; line-height: 12px; }
+.ws-page .slot .fn { font-size: 8pt; height: 13px; line-height: 13px; }
 .ws-page .slot .parse { font-size: 7pt; line-height: 1.25; padding-top: 1px; }
 .ws-page .arc { stroke-width: 1; }
 .ws-page .arrows { transform: translateY(-3px); }

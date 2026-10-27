@@ -48,3 +48,12 @@ test('the whole sentence is visible from the start', () => {
   expect(container.textContent).toContain('vident')
   expect(container.querySelectorAll('.ahead')).toHaveLength(2)
 })
+
+test('a link to a later word is drawn as provisional until that word is done', () => {
+  globalThis.ResizeObserver ??= class { observe() {} disconnect() {} unobserve() {} } as unknown as typeof ResizeObserver
+  const st = at('magnae puellae vident', [{ step: 'identify', entryId: 'magnus-adj' }, { step: 'pos', pos: 'ADJ' }, { step: 'ending', ending: 'ae' },
+    { step: 'nomForm', form: { c: 'nom', n: 'pl', g: 'f' } }, { step: 'nomRole', role: { kind: 'modifies', target: 1 } }])
+  const { container } = render(<SentenceView st={st} />)
+  expect(container.querySelector('.arc.pending')).not.toBeNull()
+  expect(container.querySelector('.arc.mod')).toBeNull()
+})

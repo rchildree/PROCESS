@@ -69,6 +69,8 @@ export function checkNounLabel(f: NomForm, label: Label, openPP: { case: Case; s
     if (openPP.case !== f.c) return no(`The preposition does not take the ${CASE_NAME[f.c]}.`)
     return yes
   }
+  // Outside the kernel (e.g. ūnō diē): any case may take it.
+  if (label === '——') return yes
   const fits: Partial<Record<Case, Label[]>> = { nom: ['S', 'SC'], acc: ['O', 'OC'], abl: ['ADV'], loc: ['ADV'] }
   const allowed = fits[f.c]
   if (!allowed) return yes // genitive, dative, vocative: no labels yet

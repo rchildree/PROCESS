@@ -53,6 +53,8 @@ describe('labels', () => {
     expect(ok(checkNounLabel(f('nom'), 'S', null))).toBe(true)
     expect(ok(checkNounLabel(f('abl'), 'ADV', null))).toBe(true)
     expect(ok(checkNounLabel(f('abl'), 'PP', null))).toBe(false)
+    expect(ok(checkNounLabel(f('abl'), '——', null))).toBe(true)
+    expect(ok(checkNounLabel(f('abl'), '——', { case: 'abl' }))).toBe(false)
     expect(ok(checkNounLabel(f('abl'), 'PP', { case: 'abl' }))).toBe(true)
     expect(ok(checkNounLabel(f('abl'), 'O', { case: 'abl' }))).toBe(false)
     expect(ok(checkNounLabel(f('acc'), 'PP', { case: 'abl' }))).toBe(false)
@@ -76,7 +78,7 @@ describe('labels', () => {
     expect(ok(checkVerbLabel(L(), 'appello-v', act, '='))).toBe(false)
   })
   test('label list', () => {
-    expect(LABELS.map((l) => l.id)).toEqual(['S', 'O', 'SC', 'OC', 'V', 'PV', '=', 'X', 'PP', 'ADV', '+', '↓'])
+    expect(LABELS.map((l) => l.id)).toEqual(['S', 'O', 'SC', 'OC', 'V', 'PV', '=', 'X', 'PP', 'ADV', '+', '↓', '——'])
   })
 })
 

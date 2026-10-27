@@ -12,8 +12,8 @@ export const CASE_ABBR: Record<string, string> = { nom: 'nom', gen: 'gen', dat: 
 
 export function verbText(f: VerbForm): string {
   if (f.k === 'inf') return `${f.t} ${f.v} inf`
-  if (f.k === 'imp') return `${f.v} imp ${f.n}`
-  return `${f.t} ${f.m} ${f.v} ${f.p}${f.n}`
+  if (f.k === 'imp') return `${f.v} imp 2${f.n}`
+  return `${f.t} ${f.v} ${f.m} ${f.p}${f.n}`
 }
 
 /** The function label shown in the shared label row. Empty when an arrow shows the job instead. */
@@ -52,7 +52,7 @@ export function detailsOf(st: SessionState, i: number, words: WordState[] = st.w
   const w = words[i]
   const la = (j: number) => ({ la: surfaceOf(st.tokens[j]) })
   const lines: DetailLine[] = []
-  if (w.pos) lines.push([w.pos])
+  if (w.pos && w.pos !== 'OTHER') lines.push([w.pos])
   const seg = segments(st, i, words)
   if (seg) lines.push([{ la: seg }])
   if (w.nomForm) lines.push([`${CASE_ABBR[w.nomForm.c]} ${w.nomForm.n} ${w.nomForm.g}`])

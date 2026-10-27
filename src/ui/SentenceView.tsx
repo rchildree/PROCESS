@@ -11,14 +11,16 @@ interface Props {
   onPickWord?: (i: number) => void
 }
 
-interface Link { from: number; to: number; kind: 'mod' | 'ante' }
+interface Link { from: number; to: number; kind: 'mod' | 'ante' | 'pending' }
 interface Arc { d: string; kind: Link['kind']; key: string; open?: boolean }
 
 function linksOf(words: WordState[]): Link[] {
   const out: Link[] = []
   words.forEach((w, i) => {
-    // A link to a later word is drawn once that word is finished and the link has been checked.
-    if (w.role?.kind === 'modifies' && (w.role.target < i || words[w.role.target]?.done)) out.push({ from: i, to: w.role.target, kind: 'mod' })
+    const r = w.role
+    // A link to a later word stays provisional (dashed, with a ?) until that word is finished and the link checked.
+    if (r && 'target' in r && r.target > i && !words[r.target]?.done) out.push({ from: i, to: r.target, kind: 'pending' })
+    else if (r?.kind === 'modifies') out.push({ from: i, to: r.target, kind: 'mod' })
     if (w.antecedent !== undefined && w.antecedent !== null) out.push({ from: i, to: w.antecedent, kind: 'ante' })
   })
   return out
@@ -87,6 +89,10 @@ export function SentenceView({ st, reviewable, reviewing = null, onPickWord }: P
           </marker>
           <marker id="dot-ante" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="6" markerHeight="6">
             <circle cx="4" cy="4" r="3.5" className="head-ante" />
+          </marker>
+          {/* A provisional link to a word not reached yet ends in a question mark instead of a dot. */}
+          <marker id="dot-pending" viewBox="0 0 16 20" refX="8" refY="17" markerWidth="16" markerHeight="20" markerUnits="userSpaceOnUse">
+            <text x="8" y="17" textAnchor="middle" className="head-pending">?</text>
           </marker>
         </defs>
         {paths.map((p) => <path key={p.key} d={p.d} className={`arc ${p.kind}${p.open ? ' open' : ''}`} markerEnd={p.open ? undefined : `url(#dot-${p.kind})`} />)}

@@ -176,8 +176,8 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
       break
     case 'verbForm': {
       title = 'Parse the verb.'
-      const kinds = w.path === 'inf' ? (['inf'] as const) : (['fin', 'imp'] as const)
-      body = <VerbFormPicker key={`${i}-vf`} options={options} kinds={[...kinds]} onSubmit={(form) => onAnswer({ step: 'verbForm', form })} />
+      // Finite and infinitive are both offered: the check explains a wrong pick.
+      body = <VerbFormPicker key={`${i}-vf`} options={options} kinds={['fin', 'inf', 'imp']} start={w.path === 'inf' ? 'inf' : 'fin'} onSubmit={(form) => onAnswer({ step: 'verbForm', form })} />
       break
     }
     case 'verbRole':
