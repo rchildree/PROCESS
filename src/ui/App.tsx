@@ -98,7 +98,7 @@ export default function App() {
   useEffect(() => {
     Promise.all([
       fetchDataset('./data/knudsvig-731/').then(buildLexicon),
-      fetch('./sets/index.json').then((r) => { if (!r.ok) throw new Error('Could not load the sentence sets.'); return r.json() }),
+      fetch('./sets/index.json', { cache: 'no-cache' }).then((r) => { if (!r.ok) throw new Error('Could not load the sentence sets.'); return r.json() }),
     ])
       .then(([lex, idx]) => { setBaseLex(lex); setIndex(idx) })
       .catch((e: Error) => setLoadError(e.message))
@@ -108,18 +108,10 @@ export default function App() {
 
   const openSet = useCallback(async (item: SetIndexItem, sentenceIdx?: number) => {
     try {
-      const r = await fetch(`./sets/${item.file}`)
+      const r = await fetch(`./sets/${item.file}`, { cache: 'no-cache' })
       if (!r.ok) throw new Error('Could not load that set.')
       const s: SentenceSet = await r.json()
       setAnswerKey(null)
-      if (item.key) {
-        fetch(`./sets/${item.key}`)
-          .then((k) => (k.ok ? k.json() : null))
-          .then((k: { sentences: Record<string, KeyWord[]> } | null) => {
-            if (k) setAnswerKey(new Map(Object.entries(k.sentences).map(([n, w]) => [Number(n), w])))
-          })
-          .catch(() => { /* no key: the peek button just doesn't appear */ })
-      }
       const d = doneSet(s.id)
       const front = reachOf(d, s.sentences.length)
       setSet(s)
@@ -130,6 +122,29 @@ export default function App() {
       setLoadError((e as Error).message)
     }
   }, [])
+
+  const keyPath = index?.find((item) => item.id === set?.id)?.key
+  useEffect(() => {
+    if (!keyPath) return
+    let request: AbortController | undefined
+    const refresh = () => {
+      request?.abort()
+      const controller = new AbortController()
+      request = controller
+      fetch(`./sets/${keyPath}`, { cache: 'no-cache', signal: controller.signal })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((k: { sentences: Record<string, KeyWord[]> } | null) => {
+          if (k && !controller.signal.aborted) setAnswerKey(new Map(Object.entries(k.sentences).map(([n, w]) => [Number(n), w])))
+        })
+        .catch(() => { /* Keep the last loaded key if a refresh fails or is cancelled. */ })
+    }
+    refresh()
+    window.addEventListener('focus', refresh)
+    return () => {
+      request?.abort()
+      window.removeEventListener('focus', refresh)
+    }
+  }, [keyPath, set])
 
   // Reopen where the student left off.
   useEffect(() => {

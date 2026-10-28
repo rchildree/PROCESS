@@ -19,7 +19,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-test('holding the exported key keeps the teacher’s breakdown and participle details visible', async () => {
+test('returning to an open page refreshes an older key with the teacher’s breakdown and participle details', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} unobserve() {} })
   setTeacher(false)
   const text = 'īnstrūcta est.'
@@ -36,10 +36,11 @@ test('holding the exported key keeps the teacher’s breakdown and participle de
   expect(teacher.step).toBe('done')
   const set: SentenceSet = { id: 'demo', title: 'Demo', sentences: [{ text, tokens }] }
   const key = parseKey(keyFile(set, [teacher]))
+  const legacy = parseKey(keyFile(set, [teacher]).split('\n').map((line) => line.split('|').slice(0, 6).join('|')).join('\n'))
   const routes: Record<string, unknown> = {
     './sets/index.json': [{ id: set.id, title: set.title, count: 1, file: 'demo.json', key: 'demo.key.json' }],
     './sets/demo.json': set,
-    './sets/demo.key.json': { setId: set.id, sentences: Object.fromEntries(key.sentences) },
+    './sets/demo.key.json': { setId: set.id, sentences: Object.fromEntries(legacy.sentences) },
   }
   vi.mocked(fetchDataset).mockResolvedValue(loadDatasetFromDir('public/data/knudsvig-731'))
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
@@ -57,7 +58,14 @@ test('holding the exported key keeps the teacher’s breakdown and participle de
   expect(original[0]).toContain('pf pass ptc')
   fireEvent.keyDown(peek, { key: ' ' })
   expect(peek.getAttribute('aria-pressed')).toBe('true')
-  expect(details()).toEqual(original)
+  expect(details()[0]).not.toContain('īnstrūct·a')
+  fireEvent.keyUp(peek, { key: ' ' })
+  // A deployment updates the file while the same sentence is still open.
+  routes['./sets/demo.key.json'] = { setId: set.id, sentences: Object.fromEntries(key.sentences) }
+  fireEvent(window, new Event('focus'))
+  fireEvent.keyDown(peek, { key: ' ' })
+  await waitFor(() => expect(details()).toEqual(original))
+  expect(fetch).toHaveBeenLastCalledWith('./sets/demo.key.json', expect.objectContaining({ cache: 'no-cache' }))
   expect(screen.getByRole('status').textContent).toBe('Your parse matches the key.')
   // The hint and alternate details still reserve their space during the hold.
   expect(container.querySelector('.sentence-hint')?.classList.contains('concealed')).toBe(true)

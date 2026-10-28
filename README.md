@@ -60,6 +60,8 @@ In teacher mode:
 Put the key file in `sets/` next to the set and run `npm run sets`. The builder turns it into
 `public/sets/<set-id>.key.json` and stops if a key's words no longer line up with the set (say, after
 a sentence was edited): re-export the key then.
+Production builds regenerate this data too. The app rechecks the key when you return to its tab,
+so an open sentence picks up newly published working details without losing your saved answers.
 
 Once a student finishes a sentence that has a key, a **Hold to see the key** button appears. Holding it
 (mouse, finger, or Space/Enter) shows the key's parse in place of theirs, with the words that differ
