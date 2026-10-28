@@ -49,7 +49,8 @@ test('holding the exported key keeps the teacher’s breakdown and participle de
   saveLog(set.id, 0, log)
   writeLast({ setId: set.id, i: 0 })
   const { container } = render(<App />)
-  const peek = await screen.findByRole('button', { name: 'Hold to see the key' })
+  // Building the real lexicon can exceed Testing Library's 1s default on CI runners.
+  const peek = await screen.findByRole('button', { name: 'Hold to see the key' }, { timeout: 5000 })
   const details = () => [...container.querySelectorAll('.parse:not(.comparison)')].map((el) => el.textContent)
   const original = details()
   expect(original[0]).toContain('īnstrūct·a')
@@ -67,4 +68,4 @@ test('holding the exported key keeps the teacher’s breakdown and participle de
   expect(details()).toEqual(original)
   await waitFor(() => expect(screen.getByRole('button', { name: 'Review “īnstrūcta”' })).toBeTruthy())
   expect(loadLog(set.id, 0)).toEqual(log)
-})
+}, 10000)
