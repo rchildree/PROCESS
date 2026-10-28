@@ -86,7 +86,8 @@ test('alter takes a zero ending', () => {
 
 describe('completion check', () => {
   test('every token in every shipped set can be completed', () => {
-    for (const f of readdirSync('sets')) {
+    // Match the build's sentence sources; answer keys have their own parser and validation.
+    for (const f of readdirSync('sets').filter((f) => /\.(md|txt)$/i.test(f) && !/\.key\.md$/i.test(f))) {
       for (const set of parseSetFile(f, readFileSync('sets/' + f, 'utf8'), known)) {
         for (const s of set.sentences) for (const t of s.tokens) expect(tokenProblems(lex(), t), `${f}: ${t.surface}`).toBeNull()
       }
