@@ -68,7 +68,7 @@ button { font: inherit; color: inherit; }
 .app { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
 
 .top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
-.top h1 { font-family: var(--ui); font-weight: 600; font-size: 28px; margin: 0; letter-spacing: 0.01em; }
+.top h1 { font-family: var(--latin); font-weight: 800; font-size: 28px; margin: 0; font-variant-caps: all-small-caps; }
 .top h1 span { color: var(--muted); font-weight: 400; font-style: italic; }
 
 .set-picker { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); min-width: 0; }
