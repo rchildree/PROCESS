@@ -44,6 +44,26 @@ Function labels live in `src/core/data/labels.ts`; copular/factitive verb lists 
 Sentences are worked in order: a student can open any sentence they've finished plus the first
 unfinished one, never one further ahead.
 
+## Teacher mode and answer keys
+
+Open the app with `?key` at the end of the address (for example `…/saban-the-process/?key`) to turn on
+teacher mode; the browser remembers it until you click **turn off** in the header (or open `?key=off`).
+In teacher mode:
+
+- your parsing is saved apart from any student progress on the same computer;
+- every sentence can be opened, in any order;
+- **Export key** (under the sentence) downloads `<set-id>.key.md` with every word you've finished in
+  that set: one line per word giving its dictionary entry, part of speech, form and function, with
+  links named by word number. Unfinished words and sentences are left out.
+
+Put the key file in `sets/` next to the set. The set builder skips `*.key.md` files. Nothing reads keys
+yet; a Check step that compares a student's parse with the key will come later.
+
+## Translations
+
+When a sentence is finished, a box under it takes the student's translation. It saves as they type
+and prints on the worksheet in place of the ruled lines (untick **My translations** to get blank lines).
+
 ## Printable worksheet
 
 `print.html` (linked as **Printable worksheet** under each sentence) prints a set with the

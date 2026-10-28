@@ -1,0 +1,87 @@
+import { describe, expect, test } from 'vitest'
+import { lex } from '../helpers/lex.ts'
+import { tokenize, type SentenceSet } from '../../src/core/sets.ts'
+import { replay, type Answer } from '../../src/core/session.ts'
+import type { NomForm, VerbForm } from '../../src/core/checks.ts'
+import { keyFile, keyWords, parseKey } from '../../src/core/key.ts'
+
+const known = (w: string) => lex().lookup(w).length > 0
+const nf = (c: NomForm['c'], n: NomForm['n'], g: NomForm['g']): NomForm => ({ c, n, g })
+const fin = (t: VerbForm['t'], v: VerbForm['v'], p: VerbForm['p'], n: VerbForm['n']): VerbForm => ({ k: 'fin', t, m: 'ind', v, p, n })
+const noun = (id: string, ending: string, form: NomForm, label: any): Answer[] => [
+  { step: 'identify', entryId: id }, { step: 'pos', pos: 'N' }, { step: 'ending', ending }, { step: 'nomForm', form },
+  { step: 'nomRole', role: { kind: 'label', label } },
+]
+
+const PP_TEXT = 'medicus timidum puerum magnā cum cūrā cūrāvit.'
+const PP: Answer[] = [
+  ...noun('medicus-n', 'us', nf('nom', 'sg', 'm'), 'S'),
+  { step: 'identify', entryId: 'timidus-adj' }, { step: 'pos', pos: 'ADJ' }, { step: 'ending', ending: 'um' }, { step: 'nomForm', form: nf('acc', 'sg', 'm') },
+  { step: 'nomRole', role: { kind: 'modifies', target: 2 } },
+  ...noun('puer-n', 'um', nf('acc', 'sg', 'm'), 'O'),
+  { step: 'identify', entryId: 'magnus-adj' }, { step: 'pos', pos: 'ADJ' }, { step: 'ending', ending: 'ā' }, { step: 'nomForm', form: nf('abl', 'sg', 'f') },
+  { step: 'nomRole', role: { kind: 'modifies', target: 5 } },
+  { step: 'identify', entryId: 'cum-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
+  ...noun('cura-n', 'ā', nf('abl', 'sg', 'f'), 'PP'), { step: 'ppPrep', target: 4 },
+  { step: 'identify', entryId: 'curo-v' }, { step: 'pos', pos: 'V' }, { step: 'personal', ending: 'it' }, { step: 'stem', stem: 'cūrāv' }, { step: 'stemType', t: 'pfAct' },
+  { step: 'verbForm', form: fin('pf', 'act', '3', 'sg') }, { step: 'verbRole', role: { kind: 'label', label: 'V' } },
+]
+
+const PV_TEXT = 'aciēs in agrō īnstrūcta est.'
+const PV: Answer[] = [
+  ...noun('acies-n', 'ēs', nf('nom', 'sg', 'f'), 'S'),
+  { step: 'identify', entryId: 'in-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
+  ...noun('ager-n', 'ō', nf('abl', 'sg', 'm'), 'PP'), { step: 'ppPrep', target: 1 },
+  { step: 'identify', entryId: 'instruo-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'a' },
+  { step: 'stem', stem: 'īnstrūct' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: nf('nom', 'sg', 'f') }, { step: 'nomRole', role: { kind: 'verbPart', target: 4 } },
+  { step: 'identify', entryId: 'sum-v' }, { step: 'pos', pos: 'V' },
+  { step: 'compoundForm', form: fin('pf', 'pass', '3', 'sg') }, { step: 'compoundRole', role: { kind: 'label', label: 'PV' } },
+]
+
+const st = (text: string, log: Answer[]) => {
+  const s = replay(tokenize(text, known), log, lex())
+  expect(s.log.length).toBe(log.length)
+  return s
+}
+
+describe('answer keys', () => {
+  test('a word line names the entry, form and function, with links by number', () => {
+    const words = keyWords(st(PP_TEXT, PP))
+    expect(words[1]).toEqual({ n: 2, word: 'timidum', entry: 'timidus-adj', pos: 'ADJ', form: 'acc sg m', fn: '→ 3 puerum' })
+    expect(words[4]).toMatchObject({ word: 'cum', form: '+ abl' })
+    expect(words[5]).toMatchObject({ word: 'cūrā', fn: 'PP; with 5 cum' })
+    expect(words[6]).toMatchObject({ form: 'pf act ind 3sg', fn: 'V' })
+  })
+
+  test('a compound verb carries its form and label on both parts', () => {
+    const words = keyWords(st(PV_TEXT, PV))
+    expect(words[3]).toMatchObject({ word: 'īnstrūcta', form: 'nom sg f; pf pass ind 3sg', fn: 'PV with 5 est' })
+    expect(words[4]).toMatchObject({ word: 'est', fn: 'PV with 4 īnstrūcta' })
+  })
+
+  test('only finished words go in; untouched sentences are left out', () => {
+    const half = st(PP_TEXT, PP.slice(0, 5))
+    expect(keyWords(half).map((w) => w.word)).toEqual(['medicus'])
+    const set: SentenceSet = {
+      id: 'demo', title: 'Demo',
+      sentences: [PP_TEXT, PV_TEXT].map((text) => ({ text, tokens: tokenize(text, known) })),
+    }
+    const file = keyFile(set, [null, st(PV_TEXT, PV)])
+    expect(file).not.toMatch(/^## 1$/m)
+    expect(file).toMatch(/^## 2$/m)
+  })
+
+  test('a key file reads back to the same lines', () => {
+    const set: SentenceSet = {
+      id: 'demo', title: 'Demo',
+      sentences: [PP_TEXT, PV_TEXT].map((text) => ({ text, tokens: tokenize(text, known) })),
+    }
+    const a = st(PP_TEXT, PP)
+    const b = st(PV_TEXT, PV)
+    const parsed = parseKey(keyFile(set, [a, b]))
+    expect(parsed.setId).toBe('demo')
+    expect(parsed.title).toBe('Demo')
+    expect(parsed.sentences.get(1)).toEqual(keyWords(a))
+    expect(parsed.sentences.get(2)).toEqual(keyWords(b))
+  })
+})

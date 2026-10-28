@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { lex } from '../helpers/lex.ts'
 import { tokenize } from '../../src/core/sets.ts'
 import { replay, startSession, submit, type Answer } from '../../src/core/session.ts'
-import { clearLog, doneSet, frontierOf, loadLog, markDone, saveLog } from '../../src/ui/progress.ts'
+import {
+  clearLog, doneSet, frontierOf, initTeacherMode, isTeacher, loadLog, loadTranslation, markDone, saveLog, saveTranslation, setTeacher,
+} from '../../src/ui/progress.ts'
 
 beforeEach(() => localStorage.clear())
 afterEach(() => vi.restoreAllMocks())
@@ -57,5 +59,34 @@ describe('frontierOf', () => {
   })
   test('all done: stays on the last sentence', () => {
     expect(frontierOf(new Set([0, 1, 2]), 3)).toBe(2)
+  })
+})
+
+describe('teacher mode', () => {
+  afterEach(() => setTeacher(null))
+
+  test('?key turns it on and remembers; ?key=off turns it off', () => {
+    expect(initTeacherMode('')).toBe(false)
+    expect(initTeacherMode('?key')).toBe(true)
+    setTeacher(null)
+    expect(isTeacher()).toBe(true)
+    expect(initTeacherMode('?key=off')).toBe(false)
+    setTeacher(null)
+    expect(isTeacher()).toBe(false)
+  })
+
+  test('teacher work and translations are kept apart from the student’s', () => {
+    const log: Answer[] = [{ step: 'identify', entryId: 'medicus-n' }]
+    saveLog('set-a', 0, log)
+    markDone('set-a', 0)
+    saveTranslation('set-a', 0, 'The doctor')
+    setTeacher(true)
+    expect(loadLog('set-a', 0)).toEqual([])
+    expect(doneSet('set-a').size).toBe(0)
+    expect(loadTranslation('set-a', 0)).toBe('')
+    saveTranslation('set-a', 0, 'Key version')
+    setTeacher(false)
+    expect(loadLog('set-a', 0)).toEqual(log)
+    expect(loadTranslation('set-a', 0)).toBe('The doctor')
   })
 })

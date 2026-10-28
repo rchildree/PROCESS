@@ -1,4 +1,5 @@
 // Turns teacher files in sets/ into public/sets/*.json. Fails if any word is unknown.
+// Answer keys (*.key.md) sit beside the sets and are skipped here.
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { loadDatasetFromDir } from '../src/core/loadDataset.node.ts'
@@ -15,7 +16,7 @@ const problems: string[] = []
 const outputs: [string, string][] = []
 const seen = new Set<string>()
 
-for (const f of readdirSync(SRC).filter((f) => /\.(md|txt)$/i.test(f)).sort()) {
+for (const f of readdirSync(SRC).filter((f) => /\.(md|txt)$/i.test(f) && !/\.key\.md$/i.test(f)).sort()) {
   for (const set of parseSetFile(f, readFileSync(join(SRC, f), 'utf8'), known)) {
     if (seen.has(set.id)) { problems.push(`${f}: duplicate set id "${set.id}"`); continue }
     seen.add(set.id)

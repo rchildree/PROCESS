@@ -57,6 +57,7 @@
 .ws-vocab b { font-family: var(--serif); font-weight: 600; color: #000; font-size: 6pt; margin-right: 3px; }
 
 .ws-lines { margin-top: 2px; }
+.ws-translation { font-family: var(--serif); font-size: 9pt; line-height: 1.45; margin: 3px 0 0; padding-bottom: 3px; border-bottom: 0.75px solid #777; white-space: pre-wrap; }
 .ws-line { height: 18px; border-bottom: 0.75px solid #777; }
 
 @page { margin: 0.5in; }

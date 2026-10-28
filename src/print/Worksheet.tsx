@@ -4,22 +4,23 @@ import { buildLexicon, withGlosses } from '../core/lexicon.ts'
 import type { SentenceSet, SetIndexItem } from '../core/sets.ts'
 import { replay, type SessionState } from '../core/session.ts'
 import type { Lexicon } from '../core/types.ts'
-import { loadProgress } from '../ui/progress.ts'
+import { loadProgress, loadTranslation, readLast } from '../ui/progress.ts'
 import { SentenceView } from '../ui/SentenceView.tsx'
 import '../ui/styles.css'
 import './print.css'
 
-const LAST_KEY = 'process:v1:last'
 const OPTS_KEY = 'process:v1:print'
 
-interface Opts { parsing: boolean; vocab: boolean; lines: number }
-const DEFAULT_OPTS: Opts = { parsing: true, vocab: true, lines: 3 }
+interface Opts { parsing: boolean; vocab: boolean; translations: boolean; lines: number }
+const DEFAULT_OPTS: Opts = { parsing: true, vocab: true, translations: true, lines: 3 }
 
 function readJSON<T>(key: string, fallback: T): T {
   try { return { ...fallback, ...JSON.parse(localStorage.getItem(key) ?? '{}') } } catch { return fallback }
 }
 
-interface Item { n: number; text: string; st: SessionState | null; started: boolean; finished: boolean; vocab: { dict: string; def: string }[] }
+interface Item {
+  n: number; text: string; st: SessionState | null; started: boolean; finished: boolean; vocab: { dict: string; def: string }[]; translation: string
+}
 
 /** A sentence's saved work, shown with every word visible whether or not the student reached it. */
 function itemFor(set: SentenceSet, i: number, lex: Lexicon): Item {
@@ -39,6 +40,7 @@ function itemFor(set: SentenceSet, i: number, lex: Lexicon): Item {
     started,
     finished: st.step === 'done',
     vocab,
+    translation: loadTranslation(set.id, i),
   }
 }
 
@@ -57,7 +59,7 @@ export function Worksheet() {
       .then(([lex, idx]: [Lexicon, SetIndexItem[]]) => {
         setBaseLex(lex)
         setIndex(idx)
-        const wanted = new URLSearchParams(location.search).get('set') ?? readJSON<{ setId?: string }>(LAST_KEY, {}).setId
+        const wanted = new URLSearchParams(location.search).get('set') ?? readLast().setId
         const item = idx.find((x) => x.id === wanted) ?? idx[0]
         if (item) open(item)
       })
@@ -96,6 +98,7 @@ export function Worksheet() {
         </label>
         <label className="check"><input type="checkbox" checked={opts.parsing} onChange={(e) => change({ parsing: e.target.checked })} /> My parsing</label>
         <label className="check"><input type="checkbox" checked={opts.vocab} onChange={(e) => change({ vocab: e.target.checked })} /> Vocabulary</label>
+        <label className="check"><input type="checkbox" checked={opts.translations} onChange={(e) => change({ translations: e.target.checked })} /> My translations</label>
         <label>
           <span>Lines per sentence</span>
           <select value={opts.lines} onChange={(e) => change({ lines: Number(e.target.value) })}>
@@ -125,9 +128,13 @@ export function Worksheet() {
                     {it.vocab.map((v) => <li key={v.dict}><b>{v.dict}</b> {v.def}</li>)}
                   </ul>
                 )}
-                <div className="ws-lines" aria-label="Space for your translation">
-                  {Array.from({ length: opts.lines }, (_, k) => <div key={k} className="ws-line" />)}
-                </div>
+                {opts.translations && it.translation
+                  ? <p className="ws-translation">{it.translation}</p>
+                  : (
+                    <div className="ws-lines" aria-label="Space for your translation">
+                      {Array.from({ length: opts.lines }, (_, k) => <div key={k} className="ws-line" />)}
+                    </div>
+                  )}
               </div>
             </section>
           ))}
