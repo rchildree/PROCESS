@@ -9,6 +9,10 @@ interface Props {
   reviewable?: Set<number>
   reviewing?: number | null
   onPickWord?: (i: number) => void
+  /** Words to mark as differing from the answer key. */
+  marked?: Set<number>
+  /** The answer key is being shown in place of the student's work. */
+  peeking?: boolean
 }
 
 interface Link { from: number; to: number; kind: 'mod' | 'ante' | 'pending' }
@@ -30,7 +34,7 @@ function linksOf(words: WordState[]): Link[] {
   return out
 }
 
-export function SentenceView({ st, reviewable, reviewing = null, onPickWord }: Props) {
+export function SentenceView({ st, reviewable, reviewing = null, onPickWord, marked, peeking = false }: Props) {
   const active = activeIndex(st)
   const ed = st.editing
   const finished = st.step === 'done'
@@ -84,7 +88,7 @@ export function SentenceView({ st, reviewable, reviewing = null, onPickWord }: P
   }, [linkKey, st])
 
   return (
-    <div className="sentence-wrap" ref={box}>
+    <div className={peeking ? 'sentence-wrap peeking' : 'sentence-wrap'} ref={box}>
       <svg className="arrows" aria-hidden="true">
         <defs>
           {/* A dot where the line lands on the noun (or antecedent): no direction to look awkward. */}
@@ -118,6 +122,7 @@ export function SentenceView({ st, reviewable, reviewing = null, onPickWord }: P
             ghost ? 'ghost' : '',
             broken ? 'broken' : '',
             reviewing === i ? 'reviewing' : '',
+            marked?.has(i) ? 'differs' : '',
           ].filter(Boolean).join(' ')
           const showParse = ghost || w.done || finished || (i !== active && !!w.role)
           const label = showParse ? labelOf(st, i, words) : ''

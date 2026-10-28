@@ -4,7 +4,11 @@ import type { Gloss, Lexicon, Pos } from './types.ts'
 export interface Token { index: number; surface: string; host?: string; enclitic?: 'que' | 'ne' | 've'; punctAfter?: string; punctBefore?: string }
 export interface SetSentence { text: string; tokens: Token[] }
 export interface SentenceSet { id: string; title: string; lesson?: number; sentences: SetSentence[]; glosses?: Gloss[] }
-export interface SetIndexItem { id: string; title: string; lesson?: number; count: number; file: string }
+export interface SetIndexItem {
+  id: string; title: string; lesson?: number; count: number; file: string
+  /** The answer key's file, when the set has one. */
+  key?: string
+}
 
 const PUNCT = `,.;:?!"“”'‘’()[]—–`
 const ENCLITICS = ['que', 'ne', 've'] as const

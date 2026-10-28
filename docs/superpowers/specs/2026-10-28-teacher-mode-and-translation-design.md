@@ -44,8 +44,13 @@ place of the ruled lines (a "My translations" option, on by default).
 A Check button after a finished sentence compares the student's lines with the key, column by
 column, and marks differing words in the sentence view. Comparison only: no model translation, no notes.
 
-## Later: hold to see the key (not built)
+## Hold to see the key (built 2026-10-28)
 
-Holding a button swaps key data into the sentence view; letting go shows the student's work again.
-Only available after Check. Unkeyed parts keep the student's answers; differing words stay marked
-while held. Needs pointer events that don't trigger touch text selection, and a keyboard equivalent.
+The set builder compiles `*.key.md` into `public/sets/<set-id>.key.json` (named in the index as `key`)
+and fails when key words no longer match the set. Once a keyed sentence is finished, holding
+**Hold to see the key** (pointer with capture, or Space/Enter) swaps the key's words into the sentence
+view; unkeyed words keep the student's answers, words that differ are marked, and a line says how many.
+Letting go, losing focus, or leaving the window shows the student's work again. Keys don't carry the
+stem split, so it isn't shown while peeking. A subordinating conjunction is written once (`↓`), and a
+word closing two clauses writes `clause ends ×2`, so clause shading can be rebuilt from the key.
+Check, when built, can sit beside this; peeking does not wait for it.

@@ -5,7 +5,7 @@ import type { SentenceSet, SetIndexItem } from '../core/sets.ts'
 import { cancelEdit, replay, startEdit, submit, type Answer, type SessionState } from '../core/session.ts'
 import type { LookupMode } from '../core/headword.ts'
 import type { Lexicon } from '../core/types.ts'
-import { keyFile } from '../core/key.ts'
+import { differences, keyFile, wordsWithKey, type KeyWord } from '../core/key.ts'
 import {
   clearLog, doneSet, frontierOf, isTeacher, loadMode, loadProgress, loadTranslation, markDone, readLast, saveLog, saveMode, saveTranslation, writeLast,
 } from './progress.ts'
@@ -41,6 +41,47 @@ function TranslationBox({ setId, i }: { setId: string; i: number }) {
   )
 }
 
+/** Press and hold (mouse, touch, or Space/Enter) to see the answer key; letting go shows your own work again. */
+function PeekButton({ on, onChange, diff }: { on: boolean; onChange: (on: boolean) => void; diff: number }) {
+  const end = () => onChange(false)
+  useEffect(() => {
+    if (!on) return
+    // Switching windows mid-hold never delivers the release, so treat it as one.
+    window.addEventListener('blur', end)
+    return () => window.removeEventListener('blur', end)
+  })
+  const isKey = (k: string) => k === ' ' || k === 'Enter'
+  return (
+    <div className="peek-row">
+      <button
+        type="button"
+        className={on ? 'peek on' : 'peek'}
+        aria-pressed={on}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return
+          // Keep the release coming here even if the finger or mouse slides off the button.
+          try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* not capturable: release still ends it */ }
+          onChange(true)
+        }}
+        onPointerUp={end}
+        onPointerCancel={end}
+        onLostPointerCapture={end}
+        onKeyDown={(e) => { if (isKey(e.key)) { e.preventDefault(); if (!e.repeat) onChange(true) } }}
+        onKeyUp={(e) => { if (isKey(e.key)) { e.preventDefault(); end() } }}
+        onBlur={end}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        {on ? 'Showing the key' : 'Hold to see the key'}
+      </button>
+      {on && (
+        <p className="peek-note" role="status">
+          {diff === 0 ? 'Your parse matches the key.' : `${diff} ${diff === 1 ? 'word differs' : 'words differ'} from yours (marked).`}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export default function App() {
   const teacher = isTeacher()
   const [baseLex, setBaseLex] = useState<Lexicon | null>(null)
@@ -52,6 +93,9 @@ export default function App() {
   const [done, setDone] = useState<Set<number>>(new Set())
   const [mode, setMode] = useState<LookupMode>(loadMode)
   const [reviewing, setReviewing] = useState<number | null>(null)
+  /** The set's answer key: sentence number (from 1) → keyed words. */
+  const [answerKey, setAnswerKey] = useState<Map<number, KeyWord[]> | null>(null)
+  const [peek, setPeek] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -69,6 +113,15 @@ export default function App() {
       const r = await fetch(`./sets/${item.file}`)
       if (!r.ok) throw new Error('Could not load that set.')
       const s: SentenceSet = await r.json()
+      setAnswerKey(null)
+      if (item.key) {
+        fetch(`./sets/${item.key}`)
+          .then((k) => (k.ok ? k.json() : null))
+          .then((k: { sentences: Record<string, KeyWord[]> } | null) => {
+            if (k) setAnswerKey(new Map(Object.entries(k.sentences).map(([n, w]) => [Number(n), w])))
+          })
+          .catch(() => { /* no key: the peek button just doesn't appear */ })
+      }
       const d = doneSet(s.id)
       const front = reachOf(d, s.sentences.length)
       setSet(s)
@@ -95,6 +148,7 @@ export default function App() {
     const base = replay(tokens, saved.log, lex)
     setSt(saved.editing && base.log.length === saved.log.length ? { ...base, editing: saved.editing } : base)
     setReviewing(null)
+    setPeek(false)
     writeLast({ setId: set.id, i: sentence })
   }, [set, sentence, lex])
 
@@ -134,6 +188,15 @@ export default function App() {
     })
     download(`${set.id}.key.md`, keyFile(set, states))
   }
+
+  const sentenceKey = sentence !== null ? answerKey?.get(sentence + 1) : undefined
+  const canPeek = !!st && st.step === 'done' && !st.editing && !!sentenceKey?.length
+  const peeking = canPeek && peek
+  const diff = useMemo(() => (canPeek && st && sentenceKey ? differences(st, sentenceKey) : new Set<number>()), [canPeek, st, sentenceKey])
+  const shown = useMemo(
+    () => (peeking && st && sentenceKey ? { ...st, words: wordsWithKey(st.words, st.tokens, sentenceKey) } : st),
+    [peeking, st, sentenceKey],
+  )
 
   const reviewable = useMemo(() => new Set(st?.trace.map((t) => t.word) ?? []), [st])
 
@@ -198,8 +261,11 @@ export default function App() {
 
       {st && set && sentence !== null && (
         <>
-          <SentenceView st={st} reviewable={reviewable} reviewing={reviewing} onPickWord={(i) => setReviewing(reviewing === i ? null : i)} />
-          {reviewable.size > 0 && <p className="sentence-hint">Click a word to see or change your answers.</p>}
+          {peeking && shown
+            ? <SentenceView st={shown} peeking marked={diff} />
+            : <SentenceView st={st} reviewable={reviewable} reviewing={reviewing} onPickWord={(i) => setReviewing(reviewing === i ? null : i)} />}
+          {reviewable.size > 0 && !peeking && <p className="sentence-hint">Click a word to see or change your answers.</p>}
+          {canPeek && <PeekButton on={peeking} onChange={(on) => { setPeek(on); if (on) setReviewing(null) }} diff={diff.size} />}
           {st.step === 'done' && !st.editing && <TranslationBox key={`${set.id}:${sentence}`} setId={set.id} i={sentence} />}
           <Workbench
             st={st}

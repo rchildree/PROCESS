@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import { lex } from '../helpers/lex.ts'
 import { tokenize, type SentenceSet } from '../../src/core/sets.ts'
-import { replay, type Answer } from '../../src/core/session.ts'
+import { replay, startSession, type Answer, type SessionState } from '../../src/core/session.ts'
 import type { NomForm, VerbForm } from '../../src/core/checks.ts'
-import { keyFile, keyWords, parseKey } from '../../src/core/key.ts'
+import { differences, keyFile, keyProblems, keyWords, parseKey, wordsWithKey } from '../../src/core/key.ts'
 
 const known = (w: string) => lex().lookup(w).length > 0
 const nf = (c: NomForm['c'], n: NomForm['n'], g: NomForm['g']): NomForm => ({ c, n, g })
@@ -83,5 +83,60 @@ describe('answer keys', () => {
     expect(parsed.title).toBe('Demo')
     expect(parsed.sentences.get(1)).toEqual(keyWords(a))
     expect(parsed.sentences.get(2)).toEqual(keyWords(b))
+  })
+})
+
+const CLAUSE_TEXT = 'dum frātrēs dormiunt, lupus agnum rapuit.'
+const CLAUSE: Answer[] = [
+  { step: 'identify', entryId: 'dum-conj' }, { step: 'pos', pos: 'CONJ' }, { step: 'conjType', t: '↓' },
+  ...noun('frater-n', 'ēs', nf('nom', 'pl', 'm'), 'S'), { step: 'clauseBoundary', ends: false },
+  { step: 'identify', entryId: 'dormio-v' }, { step: 'pos', pos: 'V' }, { step: 'personal', ending: 'nt' }, { step: 'stem', stem: 'dormi' }, { step: 'stemType', t: 'pres' },
+  { step: 'verbForm', form: fin('pres', 'act', '3', 'pl') }, { step: 'verbRole', role: { kind: 'label', label: 'V' } }, { step: 'clauseBoundary', ends: true },
+  ...noun('lupus-n', 'us', nf('nom', 'sg', 'm'), 'S'),
+  ...noun('agnus-n', 'um', nf('acc', 'sg', 'm'), 'O'),
+  { step: 'identify', entryId: 'rapio-v' }, { step: 'pos', pos: 'V' }, { step: 'personal', ending: 'it' }, { step: 'stem', stem: 'rapu' }, { step: 'stemType', t: 'pfAct' },
+  { step: 'verbForm', form: fin('pf', 'act', '3', 'sg') }, { step: 'verbRole', role: { kind: 'label', label: 'V' } },
+]
+
+/** What the sentence view draws from, minus the stem split (which keys don't carry). */
+const drawn = (words: SessionState['words']) => words.map((w) => ({
+  entryId: w.entryId, pos: w.pos, nomForm: w.nomForm, verbForm: w.verbForm, prepCase: w.prepCase, role: w.role, ppWith: w.ppWith,
+  compound: w.compound && { ...w.compound }, antecedent: w.antecedent, completes: w.completes, conjType: w.conjType, clauseDepth: w.clauseDepth,
+}))
+
+describe('seeing the key', () => {
+  test.each([['prepositional phrase', PP_TEXT, PP], ['compound passive', PV_TEXT, PV], ['dependent clause', CLAUSE_TEXT, CLAUSE]])(
+    'a %s reads back to the same parse', (_, text, log) => {
+      const s = st(text as string, log as Answer[])
+      const fresh = startSession(s.tokens)
+      const shown = wordsWithKey(fresh.words, s.tokens, parseKey(keyFile({ id: 'x', title: 'x', sentences: [{ text: text as string, tokens: s.tokens }] }, [s])).sentences.get(1)!)
+      expect(drawn(shown)).toEqual(drawn(s.words))
+    })
+
+  test('a subordinating conjunction is written once, and its clause end is kept', () => {
+    const words = keyWords(st(CLAUSE_TEXT, CLAUSE))
+    expect(words[0].fn).toBe('↓')
+    expect(words[2].fn).toBe('V; clause ends')
+  })
+
+  test('words the key leaves out keep the student’s answers', () => {
+    const s = st(PP_TEXT, PP)
+    const key = keyWords(s).filter((k) => k.n === 1)
+    const shown = wordsWithKey(s.words, s.tokens, key)
+    expect(shown[1]).toBe(s.words[1])
+  })
+
+  test('differences name only the words that disagree with the key', () => {
+    const s = st(PP_TEXT, PP)
+    const key = keyWords(s).map((k) => (k.n === 3 ? { ...k, fn: 'SC' } : k))
+    expect([...differences(s, key)]).toEqual([2])
+    expect(differences(s, keyWords(s)).size).toBe(0)
+  })
+
+  test('a key whose words no longer match the set is reported', () => {
+    const s = st(PP_TEXT, PP)
+    const set: SentenceSet = { id: 'demo', title: 'Demo', sentences: [{ text: PP_TEXT, tokens: s.tokens }] }
+    const key = parseKey(keyFile(set, [s]).replace('| puerum ', '| puellam'))
+    expect(keyProblems(set, key)).toEqual(['sentence 1: word 3 is "puerum" in the set but "puellam" in the key'])
   })
 })

@@ -1,8 +1,9 @@
 // Answer keys: a teacher's finished parse written as plain lines (one per word), and read back.
 // The same lines can be built from a student's parse, so a later check can compare column by column.
-import type { VerbForm } from './checks.ts'
-import { findCompound, surfaceOf, type SessionState } from './session.ts'
-import type { SentenceSet } from './sets.ts'
+import type { Label, NomForm, UiPos, VerbForm } from './checks.ts'
+import { findCompound, surfaceOf, type Role, type SessionState, type WordState } from './session.ts'
+import type { SentenceSet, Token } from './sets.ts'
+import type { Case, Gender, Mood, Num, Person, Tense, Voice } from './types.ts'
 
 export interface KeyWord {
   /** Word number in the sentence, from 1. */
@@ -27,10 +28,12 @@ const verbText = (f: VerbForm): string => {
 /** The key lines for every finished word of a sentence. */
 export function keyWords(st: SessionState): KeyWord[] {
   const ref = (j: number) => `${j + 1} ${surfaceOf(st.tokens[j])}`
-  const clauseEnds = new Set(st.trace.flatMap((t, k) => {
+  // A word can close more than one clause (the end of a nested clause and the one around it).
+  const clauseEnds = new Map<number, number>()
+  st.trace.forEach((t, k) => {
     const a = st.log[k]
-    return t.step === 'clauseBoundary' && a.step === 'clauseBoundary' && a.ends ? [t.word] : []
-  }))
+    if (t.step === 'clauseBoundary' && a.step === 'clauseBoundary' && a.ends) clauseEnds.set(t.word, (clauseEnds.get(t.word) ?? 0) + 1)
+  })
   const out: KeyWord[] = []
   st.words.forEach((w, i) => {
     if (!w.done) return
@@ -58,9 +61,10 @@ export function keyWords(st: SessionState): KeyWord[] {
     if (w.antecedent !== undefined) fn.push(w.antecedent === null ? 'rel. none' : `rel. → ${ref(w.antecedent)}`)
     if (w.completes !== undefined) fn.push(`completes ${ref(w.completes)}`)
     if (w.ppWith !== undefined) fn.push(`with ${ref(w.ppWith)}`)
-    if (w.conjType) fn.push(w.conjType)
+    if (w.conjType && !(r?.kind === 'label' && r.label === w.conjType)) fn.push(w.conjType)
     if (w.enclitic?.done) fn.push(`-${st.tokens[i].enclitic} ${w.enclitic.conjType ?? w.enclitic.pos ?? ''}`.trim())
-    if (clauseEnds.has(i)) fn.push('clause ends')
+    const ends = clauseEnds.get(i) ?? 0
+    if (ends) fn.push(ends > 1 ? `clause ends ×${ends}` : 'clause ends')
 
     out.push({ n: i + 1, word: surfaceOf(st.tokens[i]), entry: w.entryId ?? '', pos: w.pos ?? '', form: form.join('; '), fn: fn.join('; ') })
   })
@@ -102,4 +106,126 @@ export function parseKey(text: string): ParsedKey {
     current.push({ n: Number(cells[0]), word: cells[1], entry: cells[2], pos: cells[3], form: cells[4], fn: cells.slice(5).join('|') })
   }
   return { setId, title, sentences }
+}
+
+// ---------- reading key lines back into a parse the sentence view can draw ----------
+
+const CASES = new Set(['nom', 'gen', 'dat', 'acc', 'abl', 'voc', 'loc'])
+
+function nomFormOf(part: string): NomForm | null {
+  const m = part.match(/^(\w+) (sg|pl) (m|f|n)$/)
+  return m && CASES.has(m[1]) ? { c: m[1] as Case, n: m[2] as Num, g: m[3] as Gender } : null
+}
+
+function verbFormOf(part: string): VerbForm | null {
+  let m: RegExpMatchArray | null
+  if ((m = part.match(/^(\w+) (act|pass) inf$/))) return { k: 'inf', t: m[1] as Tense, v: m[2] as Voice }
+  if ((m = part.match(/^(act|pass) imp 2(sg|pl)$/))) return { k: 'imp', t: 'pres', v: m[1] as Voice, p: '2', n: m[2] as Num }
+  if ((m = part.match(/^(\w+) (act|pass) (\w+) ([123])(sg|pl)$/))) {
+    return { k: 'fin', t: m[1] as Tense, v: m[2] as Voice, m: m[3] as Mood, p: m[4] as Person, n: m[5] as Num }
+  }
+  return null
+}
+
+const parts = (s: string) => s.split(';').map((p) => p.trim()).filter(Boolean)
+/** "3 puerum" → word index 2. */
+const target = (s: string) => Number(s) - 1
+
+/** One keyed word as the sentence view sees it. Its stem and ending aren't in the key, so they don't show. */
+function keyWordState(k: KeyWord): WordState {
+  const w: WordState = { clauseDepth: 0, done: true }
+  if (k.entry) w.entryId = k.entry
+  if (k.pos) w.pos = k.pos as UiPos
+  const forms = parts(k.form)
+  for (const f of forms) {
+    const nf = nomFormOf(f)
+    const vf = nf ? null : verbFormOf(f)
+    const pc = f.match(/^\+ (\w+)$/)
+    if (nf) w.nomForm = nf
+    else if (vf) w.verbForm = vf
+    else if (pc) w.prepCase = pc[1] as Case
+  }
+  let role: Role | undefined
+  for (const f of parts(k.fn)) {
+    let m: RegExpMatchArray | null
+    if ((m = f.match(/^→ (\d+)/))) role = { kind: 'modifies', target: target(m[1]) }
+    else if ((m = f.match(/^subst\. (\S+)$/))) role = { kind: 'substantive', label: m[1] as Label }
+    else if ((m = f.match(/^pred\. (SC|OC)$/))) role = { kind: 'predicate', label: m[1] as 'SC' | 'OC' }
+    else if ((m = f.match(/^rel\. → (\d+)/))) w.antecedent = target(m[1])
+    else if (f === 'rel. none') w.antecedent = null
+    else if ((m = f.match(/^completes (\d+)/))) w.completes = target(m[1])
+    else if ((m = f.match(/^with (\d+)/))) w.ppWith = target(m[1])
+    else if ((m = f.match(/^(\S+) with (\d+)/))) {
+      const other = target(m[2])
+      if (w.nomForm) {
+        // The participle carries the compound: its own case/number/gender, then the whole verb's form.
+        role = { kind: 'verbPart', target: other }
+        w.compound = { ptc: -1, sum: other, form: w.verbForm, ...(m[1] !== '?' ? { label: m[1] as Label } : {}) }
+        delete w.verbForm
+      } else role = { kind: 'aux', target: other }
+    } else if ((m = f.match(/^-(que|ne|ve)\s*(.*)$/))) {
+      const t = m[2]
+      w.enclitic = t === '+' || t === '↓' ? { conjType: t, done: true } : { pos: (t || undefined) as UiPos | undefined, done: true }
+    } else if (/^clause ends/.test(f)) { /* handled with clause depth */ }
+    else if (f === '+' || f === '↓') { w.conjType = f; role ??= { kind: 'label', label: f } }
+    else role = { kind: 'label', label: f as Label }
+  }
+  if (role) w.role = role
+  return w
+}
+
+function closesOf(k: KeyWord): number {
+  const m = k.fn.match(/clause ends(?: ×(\d+))?/)
+  return m ? Number(m[1] ?? 1) : 0
+}
+
+/**
+ * The words of a sentence with every keyed word swapped in. Words the key leaves out keep the student's
+ * answers. Clause shading follows the key wherever it has the word.
+ */
+export function wordsWithKey(words: WordState[], tokens: Token[], key: KeyWord[]): WordState[] {
+  const byIndex = new Map(key.filter((k) => k.n >= 1 && k.n <= tokens.length).map((k) => [k.n - 1, k]))
+  const out = words.map((w, i) => {
+    const k = byIndex.get(i)
+    if (!k) return w
+    const ws = keyWordState(k)
+    if (ws.compound) ws.compound.ptc = i
+    return ws
+  })
+  // Rebuild clause depth: a ↓ conjunction or a relative opens a clause on its own word; "clause ends" closes after it.
+  let depth = 0
+  out.forEach((w, i) => {
+    const k = byIndex.get(i)
+    if (!k) { depth = w.clauseDepth; return }
+    const opens = w.conjType === '↓' || w.antecedent !== undefined
+    if (opens) depth++
+    w.clauseDepth = depth
+    depth = Math.max(0, depth - closesOf(k))
+  })
+  return out
+}
+
+const cmp = (k: KeyWord) => [k.entry, k.pos, k.form, k.fn].join('|').replace(/\s+/g, ' ')
+
+/** Word indexes (from 0) where the student's finished parse and the key disagree. Unkeyed words never count. */
+export function differences(st: SessionState, key: KeyWord[]): Set<number> {
+  const mine = new Map(keyWords(st).map((k) => [k.n, cmp(k)]))
+  const out = new Set<number>()
+  for (const k of key) if (mine.get(k.n) !== cmp(k)) out.add(k.n - 1)
+  return out
+}
+
+/** Problems with a key against its set's sentences (words that no longer line up after a set was edited). */
+export function keyProblems(set: SentenceSet, key: ParsedKey): string[] {
+  const out: string[] = []
+  for (const [n, words] of key.sentences) {
+    const s = set.sentences[n - 1]
+    if (!s) { out.push(`sentence ${n} is not in the set`); continue }
+    for (const k of words) {
+      const t = s.tokens[k.n - 1]
+      if (!t) out.push(`sentence ${n}: there is no word ${k.n}`)
+      else if (surfaceOf(t) !== k.word) out.push(`sentence ${n}: word ${k.n} is "${surfaceOf(t)}" in the set but "${k.word}" in the key`)
+    }
+  }
+  return out
 }
