@@ -118,6 +118,12 @@ button.tok:hover .word { text-decoration: underline; text-decoration-color: var(
 /* Grammar terms (abl sg f, pf ind act 3sg, ADJ…) in small caps; Latin words inside the details stay as written. */
 .slot .parse .gram { font-variant-caps: all-small-caps; }
 .slot .parse .la { font-family: var(--latin); }
+/* Both parses size the same grid cells, so different details never move the words during a peek. */
+.slot .tok.comparing { display: grid; grid-template-columns: max-content; grid-template-rows: 34px 24px auto; align-content: start; justify-items: center; }
+.tok.comparing > .word { grid-area: 1 / 1; }
+.tok.comparing > .fn { grid-area: 2 / 1; }
+.tok.comparing > .parse { grid-area: 3 / 1; align-self: start; }
+.comparison, .concealed { visibility: hidden; }
 .slot.current .tok { background: var(--accent-soft); }
 .slot.current .word { font-weight: 600; }
 .slot.reviewing .tok { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -253,6 +259,7 @@ button.link, a.link { background: none; border: none; color: var(--muted); text-
 /* Hold to see the key */
 .peek-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: -6px 0 16px; }
 .peek {
+  min-width: 160px;
   touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   padding: 7px 14px; border-radius: 999px; border: 1px solid var(--preset); background: var(--panel); color: var(--preset);
   font-size: 14px; cursor: pointer;

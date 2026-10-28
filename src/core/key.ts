@@ -2,8 +2,12 @@
 // The same lines can be built from a student's parse, so a later check can compare column by column.
 import type { Label, NomForm, UiPos, VerbForm } from './checks.ts'
 import { findCompound, surfaceOf, type Role, type SessionState, type WordState } from './session.ts'
+import { STEM_TYPES } from './stems.ts'
 import type { SentenceSet, Token } from './sets.ts'
 import type { Case, Gender, Mood, Num, Person, Tense, Voice } from './types.ts'
+
+const WORK_FIELDS = ['path', 'ending', 'personal', 'stem', 'stemType', 'marker'] as const
+export type KeyWork = Pick<WordState, typeof WORK_FIELDS[number]>
 
 export interface KeyWord {
   /** Word number in the sentence, from 1. */
@@ -15,6 +19,8 @@ export interface KeyWord {
   form: string
   /** Parts joined by '; ' (label, links, conjunction type, clause end). */
   fn: string
+  /** The teacher's working: keep empty endings and null markers as well as the selected split. */
+  work?: KeyWork
 }
 
 export interface ParsedKey { setId: string; title: string; sentences: Map<number, KeyWord[]> }
@@ -66,13 +72,15 @@ export function keyWords(st: SessionState): KeyWord[] {
     const ends = clauseEnds.get(i) ?? 0
     if (ends) fn.push(ends > 1 ? `clause ends ×${ends}` : 'clause ends')
 
-    out.push({ n: i + 1, word: surfaceOf(st.tokens[i]), entry: w.entryId ?? '', pos: w.pos ?? '', form: form.join('; '), fn: fn.join('; ') })
+    const work: KeyWork = Object.fromEntries(WORK_FIELDS.filter((f) => w[f] !== undefined).map((f) => [f, w[f]]))
+    out.push({ n: i + 1, word: surfaceOf(st.tokens[i]), entry: w.entryId ?? '', pos: w.pos ?? '', form: form.join('; '), fn: fn.join('; '), ...(Object.keys(work).length ? { work } : {}) })
   })
   return out
 }
 
 function table(words: KeyWord[]): string {
-  const cols = (k: KeyWord) => [String(k.n), k.word, k.entry, k.pos, k.form, k.fn]
+  // A final JSON cell preserves the working without changing the original six columns.
+  const cols = (k: KeyWord) => [String(k.n), k.word, k.entry, k.pos, k.form, k.fn, k.work ? JSON.stringify(k.work).replace(/\|/g, '\\u007c') : '']
   const rows = words.map(cols)
   const widths = rows.reduce((w, r) => r.map((c, j) => Math.max(w[j] ?? 0, [...c].length)), [] as number[])
   return rows.map((r) => r.map((c, j) => (j === r.length - 1 ? c : c + ' '.repeat(widths[j] - [...c].length))).join(' | ').trimEnd()).join('\n')
@@ -89,7 +97,24 @@ export function keyFile(set: SentenceSet, states: (SessionState | null)[]): stri
   return parts.join('\n\n') + '\n'
 }
 
-/** Reads a key file back. Lines that aren't word rows (the sentence text, blank lines) are skipped. */
+function parseWork(text: string, word: string): KeyWork {
+  const invalid = () => new Error(`Invalid working details for word ${word} in the answer key`)
+  let value: unknown
+  try { value = JSON.parse(text) } catch { throw invalid() }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid()
+  const work = value as Record<string, unknown>
+  for (const [field, v] of Object.entries(work)) {
+    if (!WORK_FIELDS.some((f) => f === field)) throw invalid()
+    if (field === 'path') {
+      if (!['nominal', 'finite', 'inf', 'none'].includes(v as string)) throw invalid()
+    } else if (field === 'stemType') {
+      if (!STEM_TYPES.some((t) => t === v)) throw invalid()
+    } else if (!(field === 'marker' && v === null) && typeof v !== 'string') throw invalid()
+  }
+  return work as KeyWork
+}
+
+/** Reads a key file back, including older six-column keys. Non-word lines are skipped. */
 export function parseKey(text: string): ParsedKey {
   let setId = ''
   let title = ''
@@ -103,7 +128,7 @@ export function parseKey(text: string): ParsedKey {
     if (!current) continue
     const cells = line.split('|').map((c) => c.trim())
     if (cells.length < 6 || !/^\d+$/.test(cells[0])) continue
-    current.push({ n: Number(cells[0]), word: cells[1], entry: cells[2], pos: cells[3], form: cells[4], fn: cells.slice(5).join('|') })
+    current.push({ n: Number(cells[0]), word: cells[1], entry: cells[2], pos: cells[3], form: cells[4], fn: cells[5], ...(cells[6] ? { work: parseWork(cells[6], cells[0]) } : {}) })
   }
   return { setId, title, sentences }
 }
@@ -131,9 +156,9 @@ const parts = (s: string) => s.split(';').map((p) => p.trim()).filter(Boolean)
 /** "3 puerum" → word index 2. */
 const target = (s: string) => Number(s) - 1
 
-/** One keyed word as the sentence view sees it. Its stem and ending aren't in the key, so they don't show. */
+/** One keyed word as the sentence view sees it, with the teacher's working when supplied. */
 function keyWordState(k: KeyWord): WordState {
-  const w: WordState = { clauseDepth: 0, done: true }
+  const w: WordState = { ...k.work, clauseDepth: 0, done: true }
   if (k.entry) w.entryId = k.entry
   if (k.pos) w.pos = k.pos as UiPos
   const forms = parts(k.form)
@@ -209,9 +234,13 @@ const cmp = (k: KeyWord) => [k.entry, k.pos, k.form, k.fn].join('|').replace(/\s
 
 /** Word indexes (from 0) where the student's finished parse and the key disagree. Unkeyed words never count. */
 export function differences(st: SessionState, key: KeyWord[]): Set<number> {
-  const mine = new Map(keyWords(st).map((k) => [k.n, cmp(k)]))
+  const mine = new Map(keyWords(st).map((k) => [k.n, k]))
   const out = new Set<number>()
-  for (const k of key) if (mine.get(k.n) !== cmp(k)) out.add(k.n - 1)
+  for (const k of key) {
+    const m = mine.get(k.n)
+    // Older keys don't assess working they never stored; new keys compare every supplied field.
+    if (!m || cmp(m) !== cmp(k) || WORK_FIELDS.some((f) => k.work?.[f] !== undefined && m.work?.[f] !== k.work[f])) out.add(k.n - 1)
+  }
   return out
 }
 

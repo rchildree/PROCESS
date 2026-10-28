@@ -73,11 +73,9 @@ function PeekButton({ on, onChange, diff }: { on: boolean; onChange: (on: boolea
       >
         {on ? 'Showing the key' : 'Hold to see the key'}
       </button>
-      {on && (
-        <p className="peek-note" role="status">
-          {diff === 0 ? 'Your parse matches the key.' : `${diff} ${diff === 1 ? 'word differs' : 'words differ'} from yours (marked).`}
-        </p>
-      )}
+      <p className={on ? 'peek-note' : 'peek-note concealed'} role="status" aria-hidden={!on}>
+        {diff === 0 ? 'Your parse matches the key.' : `${diff} ${diff === 1 ? 'word differs' : 'words differ'} from yours (marked).`}
+      </p>
     </div>
   )
 }
@@ -193,9 +191,9 @@ export default function App() {
   const canPeek = !!st && st.step === 'done' && !st.editing && !!sentenceKey?.length
   const peeking = canPeek && peek
   const diff = useMemo(() => (canPeek && st && sentenceKey ? differences(st, sentenceKey) : new Set<number>()), [canPeek, st, sentenceKey])
-  const shown = useMemo(
-    () => (peeking && st && sentenceKey ? { ...st, words: wordsWithKey(st.words, st.tokens, sentenceKey) } : st),
-    [peeking, st, sentenceKey],
+  const keyed = useMemo(
+    () => (canPeek && st && sentenceKey ? { ...st, words: wordsWithKey(st.words, st.tokens, sentenceKey) } : null),
+    [canPeek, st, sentenceKey],
   )
 
   const reviewable = useMemo(() => new Set(st?.trace.map((t) => t.word) ?? []), [st])
@@ -261,10 +259,16 @@ export default function App() {
 
       {st && set && sentence !== null && (
         <>
-          {peeking && shown
-            ? <SentenceView st={shown} peeking marked={diff} />
-            : <SentenceView st={st} reviewable={reviewable} reviewing={reviewing} onPickWord={(i) => setReviewing(reviewing === i ? null : i)} />}
-          {reviewable.size > 0 && !peeking && <p className="sentence-hint">Click a word to see or change your answers.</p>}
+          <SentenceView
+            st={peeking && keyed ? keyed : st}
+            peeking={peeking}
+            marked={peeking ? diff : undefined}
+            compareWords={keyed ? (peeking ? st.words : keyed.words) : undefined}
+            reviewable={peeking ? undefined : reviewable}
+            reviewing={peeking ? null : reviewing}
+            onPickWord={peeking ? undefined : (i) => setReviewing(reviewing === i ? null : i)}
+          />
+          {reviewable.size > 0 && <p className={peeking ? 'sentence-hint concealed' : 'sentence-hint'} aria-hidden={peeking}>Click a word to see or change your answers.</p>}
           {canPeek && <PeekButton on={peeking} onChange={(on) => { setPeek(on); if (on) setReviewing(null) }} diff={diff.size} />}
           {st.step === 'done' && !st.editing && <TranslationBox key={`${set.id}:${sentence}`} setId={set.id} i={sentence} />}
           <Workbench

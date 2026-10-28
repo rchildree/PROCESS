@@ -54,7 +54,8 @@ In teacher mode:
 - every sentence can be opened, in any order;
 - **Export key** (under the sentence) downloads `<set-id>.key.md` with every word you've finished in
   that set: one line per word giving its dictionary entry, part of speech, form and function, with
-  links named by word number. Unfinished words and sentences are left out.
+  links named by word number. A final JSON column preserves the parsing path, stem, stem type,
+  marker, and ending (including zero endings). Unfinished words and sentences are left out.
 
 Put the key file in `sets/` next to the set and run `npm run sets`. The builder turns it into
 `public/sets/<set-id>.key.json` and stops if a key's words no longer line up with the set (say, after
@@ -63,6 +64,8 @@ a sentence was edited): re-export the key then.
 Once a student finishes a sentence that has a key, a **Hold to see the key** button appears. Holding it
 (mouse, finger, or Space/Enter) shows the key's parse in place of theirs, with the words that differ
 marked; letting go shows their own work again. The key is a public file, so this is honor-system only.
+The teacher's stem breakdown and participle description appear in this view too. Older six-column
+keys still load, but must be re-exported from the teacher's saved work to include those details.
 
 ## Translations
 

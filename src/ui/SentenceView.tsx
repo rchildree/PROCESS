@@ -13,6 +13,8 @@ interface Props {
   marked?: Set<number>
   /** The answer key is being shown in place of the student's work. */
   peeking?: boolean
+  /** Reserve the same space for the student's parse and the key while comparing them. */
+  compareWords?: WordState[]
 }
 
 interface Link { from: number; to: number; kind: 'mod' | 'ante' | 'pending' }
@@ -34,7 +36,7 @@ function linksOf(words: WordState[]): Link[] {
   return out
 }
 
-export function SentenceView({ st, reviewable, reviewing = null, onPickWord, marked, peeking = false }: Props) {
+export function SentenceView({ st, reviewable, reviewing = null, onPickWord, marked, peeking = false, compareWords }: Props) {
   const active = activeIndex(st)
   const ed = st.editing
   const finished = st.step === 'done'
@@ -85,7 +87,13 @@ export function SentenceView({ st, reviewable, reviewing = null, onPickWord, mar
     return () => ro.disconnect()
     // Word widths change as labels fill in, so measure again after every answer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linkKey, st])
+  }, [linkKey, st, compareWords])
+
+  const parseDetails = (i: number, words: WordState[]) => detailsOf(st, i, words).map((line, j) => (
+    <span key={j}>{line.map((part, k) => typeof part === 'string'
+      ? <span key={k} className="gram">{part}</span>
+      : <span key={k} className="la">{part.la}</span>)}</span>
+  ))
 
   return (
     <div className={peeking ? 'sentence-wrap peeking' : 'sentence-wrap'} ref={box}>
@@ -131,18 +139,18 @@ export function SentenceView({ st, reviewable, reviewing = null, onPickWord, mar
             <>
               <span className="word" ref={(el) => { wordEls.current[i] = el }}>{t.punctBefore}{t.surface}{t.punctAfter}</span>
               <span className="fn">{label}</span>
-              <span className="parse">{showParse ? detailsOf(st, i, words).map((line, j) => (
-                <span key={j}>{line.map((part, k) => typeof part === 'string'
-                  ? <span key={k} className="gram">{part}</span>
-                  : <span key={k} className="la">{part.la}</span>)}</span>
-              )) : null}</span>
+              <span className="parse">{showParse ? parseDetails(i, words) : null}</span>
+              {compareWords && <>
+                <span className="fn comparison" aria-hidden="true">{labelOf(st, i, compareWords)}</span>
+                <span className="parse comparison" aria-hidden="true">{parseDetails(i, compareWords)}</span>
+              </>}
             </>
           )
           return (
             <li key={i} className={cls}>
               {canOpen
-                ? <button type="button" className="tok" onClick={() => onPickWord!(i)} aria-label={`Review “${t.surface}”`}>{inner}</button>
-                : <span className="tok">{inner}</span>}
+                ? <button type="button" className={compareWords ? 'tok comparing' : 'tok'} onClick={() => onPickWord!(i)} aria-label={`Review “${t.surface}”`}>{inner}</button>
+                : <span className={compareWords ? 'tok comparing' : 'tok'}>{inner}</span>}
               {broken && <span className="badge" aria-label="needs a new answer">!</span>}
             </li>
           )
