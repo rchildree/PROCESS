@@ -169,11 +169,10 @@ button.link, a.link { background: none; border: none; color: var(--muted); text-
 .results .empty { color: var(--muted); cursor: default; }
 
 .ending-word {
-  display: inline-flex; font-family: var(--latin); font-size: 40px; letter-spacing: 0.04em; padding: 6px 10px;
+  display: inline-flex; font-family: var(--latin); font-size: 40px; padding: 6px 10px;
   border-radius: 8px; border: 2px dashed var(--line); outline: none;
 }
 .ending-word:focus { border-color: var(--accent); }
-.ending-word .ch { padding: 0 1px; border-radius: 4px; }
 .ending-word .ch.sel { background: var(--accent); color: #fff; }
 .ending-word .ch.stem { background: var(--ante); color: #fff; }
 .ending-word .ch.used { color: var(--muted); text-decoration: underline; }

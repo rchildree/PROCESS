@@ -23,7 +23,8 @@ export function labelOf(st: SessionState, i: number, words: WordState[] = st.wor
   let label = ''
   if (r) {
     switch (r.kind) {
-      case 'label': case 'substantive': case 'predicate': label = r.label; break
+      // A non-kernel word (——) gets no label at all.
+      case 'label': case 'substantive': case 'predicate': label = r.label === '——' ? '' : r.label; break
       case 'modifies': label = ''; break
       case 'verbPart': case 'aux': {
         const cp = findCompound({ ...st, words }, i)
