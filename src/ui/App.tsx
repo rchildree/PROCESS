@@ -87,13 +87,18 @@ export default function App() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [set, setSet] = useState<SentenceSet | null>(null)
   const [sentence, setSentence] = useState<number | null>(null)
-  const [st, setSt] = useState<SessionState | null>(null)
+  const [sessionState, setSt] = useState<SessionState | null>(null)
   const [done, setDone] = useState<Set<number>>(new Set())
   const [mode, setMode] = useState<LookupMode>(loadMode)
   const [reviewing, setReviewing] = useState<number | null>(null)
   /** The set's answer key: sentence number (from 1) → keyed words. */
   const [answerKey, setAnswerKey] = useState<Map<number, KeyWord[]> | null>(null)
   const [peek, setPeek] = useState(false)
+
+  // Navigation renders before the effect below restores the selected sentence.
+  // Never combine the previous parse with the new sentence's key or storage ID.
+  const tokens = set && sentence !== null ? set.sentences[sentence].tokens : undefined
+  const st = sessionState?.tokens === tokens ? sessionState : null
 
   useEffect(() => {
     Promise.all([
