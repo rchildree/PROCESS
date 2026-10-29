@@ -5,6 +5,17 @@ sequence of questions about it (dictionary entry, part of speech, ending, case/n
 verb form, function) before the next word appears. Answers are checked against the
 *Latin for Reading* (knudsvig-731) vocabulary: impossible answers are rejected, possible ones accepted.
 
+## Using your own text
+
+Choose **Use your own text** beside the sentence-set picker to type or paste Latin prose.
+Add an optional title, then choose **Start parsing**. Sentence punctuation and blank lines
+separate sentences; macrons are optional. The app checks words against its Knudsvig vocabulary
+and flags unsupported words before starting.
+
+Texts appear under **Your texts** in the picker. They and their progress stay in this browser,
+including after a reload. Each new text keeps its own answers and translations, and works with
+the printable worksheet. Custom texts do not have a supplied answer key.
+
 ## Adding a sentence set
 
 1. Put a `.md` or `.txt` file in `sets/`.

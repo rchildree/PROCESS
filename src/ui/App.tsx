@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchDataset } from '../core/loadDataset.browser.ts'
 import { buildLexicon, withGlosses } from '../core/lexicon.ts'
 import type { SentenceSet, SetIndexItem } from '../core/sets.ts'
@@ -11,6 +11,8 @@ import {
 } from './progress.ts'
 import { SentenceView } from './SentenceView.tsx'
 import { Workbench } from './Workbench.tsx'
+import { CustomTextForm } from './CustomTextForm.tsx'
+import { customSet, loadCustomTexts, saveCustomTexts, type CustomText } from './customTexts.ts'
 import './styles.css'
 
 /** The furthest sentence that can be opened. Teachers can open any of them. */
@@ -94,6 +96,10 @@ export default function App() {
   /** The set's answer key: sentence number (from 1) → keyed words. */
   const [answerKey, setAnswerKey] = useState<Map<number, KeyWord[]> | null>(null)
   const [peek, setPeek] = useState(false)
+  const [customTexts, setCustomTexts] = useState(loadCustomTexts)
+  const [addingText, setAddingText] = useState(false)
+  const openRequest = useRef(0)
+  const customButton = useRef<HTMLButtonElement>(null)
 
   // Navigation renders before the effect below restores the selected sentence.
   // Never combine the previous parse with the new sentence's key or storage ID.
@@ -111,22 +117,39 @@ export default function App() {
 
   const lex = useMemo(() => (baseLex && set ? withGlosses(baseLex, set.glosses ?? []) : baseLex), [baseLex, set])
 
+  const selectSet = useCallback((s: SentenceSet, sentenceIdx?: number) => {
+    setAnswerKey(null)
+    const d = doneSet(s.id)
+    const front = reachOf(d, s.sentences.length)
+    setSet(s)
+    setDone(d)
+    setAddingText(false)
+    // Sentences are worked in order: only reopen one within the unlocked range.
+    setSentence(sentenceIdx !== undefined && sentenceIdx >= 0 && sentenceIdx <= front ? sentenceIdx : front)
+  }, [])
+
   const openSet = useCallback(async (item: SetIndexItem, sentenceIdx?: number) => {
+    const request = ++openRequest.current
     try {
       const r = await fetch(`./sets/${item.file}`, { cache: 'no-cache' })
       if (!r.ok) throw new Error('Could not load that set.')
       const s: SentenceSet = await r.json()
-      setAnswerKey(null)
-      const d = doneSet(s.id)
-      const front = reachOf(d, s.sentences.length)
-      setSet(s)
-      setDone(d)
-      // Sentences are worked in order: open the requested one only if it isn't past the first unfinished one.
-      setSentence(sentenceIdx !== undefined && sentenceIdx <= front ? sentenceIdx : front)
+      if (request === openRequest.current) selectSet(s, sentenceIdx)
     } catch (e) {
-      setLoadError((e as Error).message)
+      if (request === openRequest.current) setLoadError((e as Error).message)
     }
-  }, [])
+  }, [selectSet])
+
+  const startCustomText = (source: CustomText) => {
+    if (!baseLex) return false
+    const existing = customTexts.find((s) => s.text === source.text && s.title === source.title)
+    const texts = existing ? customTexts : [...customTexts, source]
+    if (!saveCustomTexts(texts)) return false
+    ++openRequest.current
+    setCustomTexts(texts)
+    selectSet(customSet(existing ?? source, baseLex))
+    return true
+  }
 
   const keyPath = index?.find((item) => item.id === set?.id)?.key
   useEffect(() => {
@@ -153,11 +176,17 @@ export default function App() {
 
   // Reopen where the student left off.
   useEffect(() => {
-    if (!index) return
+    if (!index || !baseLex) return
     const last = readLast()
+    const own = loadCustomTexts().find((x) => x.id === last.setId)
+    if (own) {
+      const s = customSet(own, baseLex)
+      if (s.sentences.length) selectSet(s, last.i)
+      return
+    }
     const item = index.find((x) => x.id === last.setId)
     if (item) openSet(item, last.i)
-  }, [index, openSet])
+  }, [index, baseLex, openSet, selectSet])
 
   useEffect(() => {
     if (!set || sentence === null || !lex) { setSt(null); return }
@@ -248,18 +277,35 @@ export default function App() {
             ))}
           </div>
         </div>
-        <label className="set-picker">
-          <span>Sentence set</span>
+        <div className="set-picker">
+          <div className="set-picker-heading">
+            <label htmlFor="sentence-set">Sentence set</label>
+            <button type="button" className="link custom-text-toggle" ref={customButton} aria-expanded={addingText}
+              onClick={() => { ++openRequest.current; setAddingText((on) => !on) }}>Use your own text</button>
+          </div>
           <select
+            id="sentence-set"
             value={set?.id ?? ''}
-            onChange={(e) => { const it = index.find((x) => x.id === e.target.value); if (it) openSet(it) }}
+            onChange={(e) => {
+              const own = customTexts.find((x) => x.id === e.target.value)
+              if (own && baseLex) { ++openRequest.current; selectSet(customSet(own, baseLex)); return }
+              const it = index.find((x) => x.id === e.target.value)
+              if (it) openSet(it)
+            }}
           >
             <option value="" disabled>Choose a set…</option>
             {index.map((s) => <option key={s.id} value={s.id}>{s.title} ({s.count})</option>)}
+            {customTexts.length > 0 && <optgroup label="Your texts">
+              {customTexts.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+            </optgroup>}
           </select>
-        </label>
+        </div>
       </header>
 
+      {addingText && baseLex && <CustomTextForm lex={baseLex} onStart={startCustomText}
+        onCancel={() => { setAddingText(false); customButton.current?.focus() }} />}
+
+      {!addingText && <>
       {set && (
         <nav className="sentences" aria-label="Sentences">
           {set.sentences.map((_, i) => {
@@ -275,7 +321,7 @@ export default function App() {
         </nav>
       )}
 
-      {!set && <p className="muted intro">Choose a sentence set to begin. You'll work through each sentence one word at a time.</p>}
+      {!set && <p className="muted intro">Choose a sentence set or use your own text to begin. You'll work through each sentence one word at a time.</p>}
 
       {st && set && sentence !== null && (
         <>
@@ -314,6 +360,7 @@ export default function App() {
           </footer>
         </>
       )}
+      </>}
     </main>
   )
 }

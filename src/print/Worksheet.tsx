@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { fetchDataset } from '../core/loadDataset.browser.ts'
 import { buildLexicon, withGlosses } from '../core/lexicon.ts'
 import type { SentenceSet, SetIndexItem } from '../core/sets.ts'
@@ -6,6 +6,7 @@ import { replay, type SessionState } from '../core/session.ts'
 import type { Lexicon } from '../core/types.ts'
 import { loadProgress, loadTranslation, readLast } from '../ui/progress.ts'
 import { SentenceView } from '../ui/SentenceView.tsx'
+import { customSet, loadCustomTexts } from '../ui/customTexts.ts'
 import '../ui/styles.css'
 import './print.css'
 
@@ -50,6 +51,8 @@ export function Worksheet() {
   const [set, setSet] = useState<SentenceSet | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [opts, setOpts] = useState<Opts>(() => readJSON(OPTS_KEY, DEFAULT_OPTS))
+  const [customTexts] = useState(loadCustomTexts)
+  const openRequest = useRef(0)
 
   useEffect(() => {
     Promise.all([
@@ -60,6 +63,8 @@ export function Worksheet() {
         setBaseLex(lex)
         setIndex(idx)
         const wanted = new URLSearchParams(location.search).get('set') ?? readLast().setId
+        const own = customTexts.find((x) => x.id === wanted)
+        if (own) { setSet(customSet(own, lex)); return }
         const item = idx.find((x) => x.id === wanted) ?? idx[0]
         if (item) open(item)
       })
@@ -67,10 +72,11 @@ export function Worksheet() {
   }, [])
 
   const open = (item: SetIndexItem) => {
+    const request = ++openRequest.current
     fetch(`./sets/${item.file}`)
       .then((r) => { if (!r.ok) throw new Error('Could not load that set.'); return r.json() })
-      .then(setSet)
-      .catch((e: Error) => setError(e.message))
+      .then((s: SentenceSet) => { if (request === openRequest.current) setSet(s) })
+      .catch((e: Error) => { if (request === openRequest.current) setError(e.message) })
   }
 
   const change = (o: Partial<Opts>) => {
@@ -92,8 +98,16 @@ export function Worksheet() {
         <a href="./" className="link">← Back to PROCESS</a>
         <label>
           <span>Sentence set</span>
-          <select value={set?.id ?? ''} onChange={(e) => { const it = index.find((x) => x.id === e.target.value); if (it) open(it) }}>
+          <select value={set?.id ?? ''} onChange={(e) => {
+            const own = customTexts.find((x) => x.id === e.target.value)
+            if (own && baseLex) { ++openRequest.current; setSet(customSet(own, baseLex)); return }
+            const it = index.find((x) => x.id === e.target.value)
+            if (it) open(it)
+          }}>
             {index.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+            {customTexts.length > 0 && <optgroup label="Your texts">
+              {customTexts.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+            </optgroup>}
           </select>
         </label>
         <label className="check"><input type="checkbox" checked={opts.parsing} onChange={(e) => change({ parsing: e.target.checked })} /> My parsing</label>
