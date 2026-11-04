@@ -188,7 +188,7 @@ function keyWordState(k: KeyWord): WordState {
         w.compound = { ptc: -1, sum: other, form: w.verbForm, ...(m[1] !== '?' ? { label: m[1] as Label } : {}) }
         delete w.verbForm
       } else role = { kind: 'aux', target: other }
-    } else if ((m = f.match(/^-(que|ne|ve)\s*(.*)$/))) {
+    } else if ((m = f.match(/^-(que|ne|ve|cum)\s*(.*)$/))) {
       const t = m[2]
       w.enclitic = t === '+' || t === '↓' ? { conjType: t, done: true } : { pos: (t || undefined) as UiPos | undefined, done: true }
     } else if (/^clause ends/.test(f)) { /* handled with clause depth */ }

@@ -5,6 +5,7 @@ import { startSession, submit, type Answer, type SessionState } from '../../src/
 import { checkConjType, checkPos, checkVerbForm } from '../../src/core/checks.ts'
 import { checkInfinitiveEnding, checkNominalEnding } from '../../src/core/endings.ts'
 import { tokenProblems } from '../../src/core/completable.ts'
+import { withGlosses } from '../../src/core/lexicon.ts'
 import { readdirSync, readFileSync } from 'node:fs'
 
 const known = (w: string) => lex().lookup(w).length > 0
@@ -89,7 +90,9 @@ describe('completion check', () => {
     // Match the build's sentence sources; answer keys have their own parser and validation.
     for (const f of readdirSync('sets').filter((f) => /\.(md|txt)$/i.test(f) && !/\.key\.md$/i.test(f))) {
       for (const set of parseSetFile(f, readFileSync('sets/' + f, 'utf8'), known)) {
-        for (const s of set.sentences) for (const t of s.tokens) expect(tokenProblems(lex(), t), `${f}: ${t.surface}`).toBeNull()
+        // The app adds a set's glosses to the lexicon, so check against the same thing.
+        const setLex = withGlosses(lex(), set.glosses ?? [])
+        for (const s of set.sentences) for (const t of s.tokens) expect(tokenProblems(setLex, t), `${f}: ${t.surface}`).toBeNull()
       }
     }
   })

@@ -6,6 +6,6 @@ Remus | Remus –ī m. | Remus | n
 Amūlius | Amūlius –ī m. | Amulius | n
 Amūliō | Amūlius –ī m. | Amulius | n
 Faustulus | Faustulus –ī m. | Faustulus | n
-Remōria | Remōria –ī m. | Remoria | n
-Remōriam | Remōria –ī m. | Remoria | n
+Remōria | Remōria –ae f. | Remoria | n
+Remōriam | Remōria –ae f. | Remoria | n
 Acca | Acca –ae f. | Acca | n

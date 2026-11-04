@@ -15,6 +15,21 @@ describe('tokenize', () => {
     const [t] = tokenize('hōramque', known)
     expect(t).toMatchObject({ surface: 'hōramque', host: 'hōram', enclitic: 'que' })
   })
+  test('tokenize splits -cum off pronouns', () => {
+    const t = tokenize('mēcum Tēcum sēcum nōbīscum vōbīscum quācum quibuscum', known)
+    expect(t.map((x) => [x.host, x.enclitic])).toEqual([
+      ['mē', 'cum'], ['Tē', 'cum'], ['sē', 'cum'], ['nōbīs', 'cum'], ['vōbīs', 'cum'], ['quā', 'cum'], ['quibus', 'cum'],
+    ])
+  })
+  test('tokenize splits quōcum even though the vocab lists it as one word', () => {
+    expect(known('quōcum')).toBe(true)
+    const [t] = tokenize('quōcum', known)
+    expect(t).toMatchObject({ host: 'quō', enclitic: 'cum' })
+  })
+  test('tokenize splits -cum only off pronouns', () => {
+    const t = tokenize('puercum cum quōcumque quīcum', known)
+    expect(t.map((x) => x.enclitic)).toEqual([undefined, undefined, undefined, undefined])
+  })
   test('punctuation peeled', () => {
     const t = tokenize('ait: "sī homō', known)
     expect(t.map((x) => x.surface)).toEqual(['ait', 'sī', 'homō'])

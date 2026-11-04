@@ -288,7 +288,9 @@ function afterNomRole(st: SessionState, i: number): SessionState {
 function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon): Check {
   const w = st.words[i]
   const form = w.nomForm
-  const openPP = st.openPP ? { case: st.openPP.c, soft: st.openPP.soft } : null
+  // A word carrying -cum (mēcum, quācum) is the object of that preposition.
+  const openPP = st.tokens[i].enclitic === 'cum' ? { case: 'abl' as const }
+    : st.openPP ? { case: st.openPP.c, soft: st.openPP.soft } : null
   const gloss = isGloss(w.entryId) || (w.path === 'none' && !form)
   const no = (reason: string): Check => ({ ok: false, reason })
 
@@ -551,7 +553,8 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       if (!c.ok) return fail(st, c.reason)
       st = withWord(st, i, { role: a.role })
       if (a.role.kind === 'verbPart') return finishWord(withWord(st, i, { compound: { ptc: i, sum: a.role.target } }))
-      if ((a.role.kind === 'label' || a.role.kind === 'substantive') && a.role.label === 'PP') return { ...st, step: 'ppPrep' }
+      // With -cum the preposition is part of this word, so there is none to pick.
+      if ((a.role.kind === 'label' || a.role.kind === 'substantive') && a.role.label === 'PP' && tok.enclitic !== 'cum') return { ...st, step: 'ppPrep' }
       return afterNomRole(st, i)
     }
 
@@ -664,7 +667,7 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
     }
 
     case 'encliticPos': {
-      const need: UiPos = tok.enclitic === 'ne' ? 'OTHER' : 'CONJ'
+      const need: UiPos = tok.enclitic === 'ne' ? 'OTHER' : tok.enclitic === 'cum' ? 'PREP' : 'CONJ'
       if (a.pos !== need) return fail(st, 'That is not the part of speech of this enclitic.')
       if (need === 'CONJ') return { ...withWord(st, i, { enclitic: { pos: a.pos, done: false } }), step: 'encliticConj' }
       return finishWord(withWord(st, i, { enclitic: { pos: a.pos, done: true } }))

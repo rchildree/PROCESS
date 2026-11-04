@@ -1,7 +1,8 @@
 import { tokenProblems } from './completable.ts'
+import { searchKey } from './normalize.ts'
 import type { Gloss, Lexicon, Pos } from './types.ts'
 
-export interface Token { index: number; surface: string; host?: string; enclitic?: 'que' | 'ne' | 've'; punctAfter?: string; punctBefore?: string }
+export interface Token { index: number; surface: string; host?: string; enclitic?: 'que' | 'ne' | 've' | 'cum'; punctAfter?: string; punctBefore?: string }
 export interface SetSentence { text: string; tokens: Token[] }
 export interface SentenceSet { id: string; title: string; lesson?: number; sentences: SetSentence[]; glosses?: Gloss[] }
 export interface SetIndexItem {
@@ -12,6 +13,20 @@ export interface SetIndexItem {
 
 const PUNCT = `,.;:?!"“”'‘’()[]—–`
 const ENCLITICS = ['que', 'ne', 've'] as const
+// -cum attaches only to these ablative pronouns (mēcum, nōbīscum, quācum, ...).
+const CUM_HOSTS = new Set(['me', 'te', 'se', 'nobis', 'vobis', 'quo', 'qua', 'quibus'])
+
+function splitEnclitic(word: string, isKnown: (w: string) => boolean): { host: string; enclitic: NonNullable<Token['enclitic']> } | null {
+  // -cum always splits off its pronoun, even when the vocab lists the whole word (quōcum).
+  const cumHost = word.slice(0, -3)
+  if (searchKey(word).endsWith('cum') && CUM_HOSTS.has(searchKey(cumHost)) && isKnown(cumHost)) return { host: cumHost, enclitic: 'cum' }
+  if (isKnown(word)) return null
+  for (const enc of ENCLITICS) {
+    const host = word.slice(0, -enc.length)
+    if (word.endsWith(enc) && host && isKnown(host)) return { host, enclitic: enc }
+  }
+  return null
+}
 
 export function tokenize(text: string, isKnown: (w: string) => boolean): Token[] {
   const out: Token[] = []
@@ -31,16 +46,8 @@ export function tokenize(text: string, isKnown: (w: string) => boolean): Token[]
     const tok: Token = { index: out.length, surface: word }
     if (before) tok.punctBefore = before
     if (after) tok.punctAfter = after
-    if (!isKnown(word)) {
-      for (const enc of ENCLITICS) {
-        const host = word.slice(0, -enc.length)
-        if (word.endsWith(enc) && host && isKnown(host)) {
-          tok.host = host
-          tok.enclitic = enc
-          break
-        }
-      }
-    }
+    const split = splitEnclitic(word, isKnown)
+    if (split) Object.assign(tok, split)
     out.push(tok)
   }
   return out

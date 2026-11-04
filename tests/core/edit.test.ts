@@ -72,6 +72,27 @@ describe('relative pronouns', () => {
   })
 })
 
+describe('enclitic -cum', () => {
+  const start = (): SessionState => play('puella quācum', [
+    { step: 'identify', entryId: 'puella-n' }, { step: 'pos', pos: 'N' }, { step: 'ending', ending: 'a' },
+    { step: 'nomForm', form: { c: 'nom', n: 'sg', g: 'f' } }, { step: 'nomRole', role: { kind: 'label', label: 'S' } },
+    { step: 'identify', entryId: 'qui-pron-2' }, { step: 'pos', pos: 'PRO' }, { step: 'ending', ending: 'ā' },
+    { step: 'relNG', n: 'sg', g: 'f' }, { step: 'antecedent', target: 0 }, { step: 'relCase', c: 'abl' },
+  ])
+  test('the pronoun is the object of -cum, so it is labeled PP', () => {
+    const st = start()
+    expect(submit(st, { step: 'nomRole', role: { kind: 'label', label: 'ADV' } }, lex()).error).toBeTruthy()
+    expect(submit(st, { step: 'nomRole', role: { kind: 'label', label: 'PP' } }, lex()).step).toBe('encliticPos')
+  })
+  test('-cum is a preposition', () => {
+    const st = play('', [{ step: 'nomRole', role: { kind: 'label', label: 'PP' } }], start())
+    expect(submit(st, { step: 'encliticPos', pos: 'CONJ' }, lex()).error).toBeTruthy()
+    const done = play('', [{ step: 'encliticPos', pos: 'PREP' }], st)
+    expect(done.step).toBe('done')
+    expect(done.words[1].enclitic).toEqual({ pos: 'PREP', done: true })
+  })
+})
+
 describe('going back', () => {
   const ANSWERS: Answer[] = [
     { step: 'identify', entryId: 'puella-n' }, { step: 'pos', pos: 'N' }, { step: 'ending', ending: 'ae' },
