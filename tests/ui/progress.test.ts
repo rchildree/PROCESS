@@ -2,9 +2,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { lex } from '../helpers/lex.ts'
 import { tokenize } from '../../src/core/sets.ts'
+import { TEACHER_PASSWORD } from '../../src/core/data/teacherPassword.ts'
 import { replay, startSession, submit, type Answer } from '../../src/core/session.ts'
 import {
-  clearLog, doneSet, frontierOf, initTeacherMode, isTeacher, loadLog, loadTranslation, markDone, saveLog, saveTranslation, setTeacher,
+  clearLog, doneSet, frontierOf, initTeacherMode, isTeacher, loadLog, loadTranslation, markDone, saveLog, saveTranslation, setTeacher, setTeacherPassword,
 } from '../../src/ui/progress.ts'
 
 beforeEach(() => localStorage.clear())
@@ -63,7 +64,9 @@ describe('frontierOf', () => {
 })
 
 describe('teacher mode', () => {
-  afterEach(() => setTeacher(null))
+  // These cover the no-password case; teacherGate.test.tsx covers the password prompt.
+  beforeEach(() => setTeacherPassword(null))
+  afterEach(() => { setTeacher(null); setTeacherPassword(TEACHER_PASSWORD) })
 
   test('?key turns it on and remembers; ?key=off turns it off', () => {
     expect(initTeacherMode('')).toBe(false)
