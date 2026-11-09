@@ -5,6 +5,7 @@ import {
   checkVerbForm, checkVerbLabel, compoundForms,
 } from '../../src/core/checks.ts'
 import { COPULAR, EXISTENTIAL, FACTITIVE } from '../../src/core/data/copular.ts'
+import { checkStemType } from '../../src/core/stems.ts'
 import { LABELS } from '../../src/core/data/labels.ts'
 import type { NomForm, VerbForm } from '../../src/core/checks.ts'
 
@@ -76,6 +77,15 @@ describe('labels', () => {
     expect(ok(checkVerbLabel(L(), 'amo-v', act, 'X'))).toBe(false)
     expect(ok(checkVerbLabel(L(), 'appello-v', pass, '='))).toBe(true)
     expect(ok(checkVerbLabel(L(), 'appello-v', act, '='))).toBe(false)
+  })
+  test('fīō is not deponent: factī sunt is passive, on the participle stem fact-', () => {
+    const pass: VerbForm = { k: 'fin', p: '3', n: 'pl', t: 'pf', m: 'ind', v: 'pass' }
+    expect(E('fio-v').flags).not.toContain('deponent')
+    expect(ok(checkVerbLabel(L(), 'fio-v', pass, '='))).toBe(true)
+    expect(ok(checkVerbLabel(L(), 'fio-v', pass, 'PV'))).toBe(true)
+    expect(ok(checkVerbLabel(L(), 'fio-v', pass, 'V'))).toBe(false)
+    expect(ok(checkStemType(L(), 'fio-v', 'factī', 'fact', 'pfPass'))).toBe(true)
+    expect(ok(checkStemType(L(), 'fio-v', 'fit', 'fi', 'pres'))).toBe(true)
   })
   test('label list', () => {
     expect(LABELS.map((l) => l.id)).toEqual(['S', 'O', 'SC', 'OC', 'V', 'PV', '=', 'X', 'PP', 'ADV', '+', '↓', '——', 'CINF'])

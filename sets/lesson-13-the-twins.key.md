@@ -94,13 +94,12 @@ postquam aqua dēflūxit, animal quod prope aquam vīxit puerōs vīdit et aluit
 12 | aluit    | alo-v         | V    | pf act ind 3sg | V                  | {"path":"finite","personal":"it","stem":"alu","stemType":"pfAct","marker":null}
 
 ## 6
-id animal fuit lupus fēmina.
+id animal fuit lupa.
 
-1 | id     | is-pron  | PRO | nom sg n       | → 2 animal | {"path":"nominal","ending":""}
-2 | animal | animal-n | N   | nom sg n       | S          | {"path":"nominal","ending":""}
-3 | fuit   | sum-v    | V   | pf act ind 3sg | =          | {"path":"finite","personal":"it","stem":"fu","stemType":"pfAct","marker":null}
-4 | lupus  | lupus-n  | N   | nom sg m       | SC         | {"path":"nominal","ending":"us"}
-5 | fēmina | femina-n | N   | nom sg f       | SC         | {"path":"nominal","ending":"a"}
+1 | id     | is-pron    | PRO | nom sg n       | → 2 animal | {"path":"nominal","ending":""}
+2 | animal | animal-n   | N   | nom sg n       | S          | {"path":"nominal","ending":""}
+3 | fuit   | sum-v      | V   | pf act ind 3sg | =          | {"path":"finite","personal":"it","stem":"fu","stemType":"pfAct","marker":null}
+4 | lupa   | gloss:lupa | N   |                | SC         | {"path":"none"}
 
 ## 7
 cum Faustulus, quī vir bonus sed inops fuit, animal cum puerīs in agrō vīdit, eōs domum dūxit.
