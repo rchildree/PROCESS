@@ -286,3 +286,13 @@ button.link, a.link { background: none; border: none; color: var(--muted); text-
   content: ''; position: absolute; inset: -8px -10px; border-radius: 10px; background: var(--preset-soft); z-index: -1;
 }
 .slot.differs .tok { background: var(--diff-soft); box-shadow: inset 0 -2px 0 var(--diff); }
+
+/* Teacher password prompt (?key) */
+.teacher-login { max-width: 420px; margin: 48px auto 0; }
+.teacher-login h2 { font-size: 22px; margin: 0 0 8px; }
+.teacher-login label { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; font-size: 14px; }
+.teacher-login input {
+  width: 100%; font: inherit; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px;
+}
+.teacher-login .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 16px; }

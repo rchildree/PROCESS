@@ -59,10 +59,19 @@ unfinished one, never one further ahead.
 
 Open the app with `?key` at the end of the address (for example `…/saban-the-process/?key`) to turn on
 teacher mode; the browser remembers it until you click **turn off** in the header (or open `?key=off`).
+
+To make `?key` ask for a password, run `npm run teacher-password` (it asks twice and doesn't show what
+you type), then commit and push `src/core/data/teacherPassword.ts`. Only a salted hash is saved, never
+the password. **Continue as a student** opens the app normally. Changing the password signs every
+browser out of teacher mode; `npm run teacher-password -- --remove` turns the password off. This only
+keeps students out of teacher mode: the key files themselves are still public.
+
 In teacher mode:
 
 - your parsing is saved apart from any student progress on the same computer;
 - every sentence can be opened, in any order;
+- on any sentence with a published key, **Show the key** displays it, whether or not you've parsed the
+  sentence yourself; it stays on (from sentence to sentence) until you click **Hide the key**;
 - **Export key** (under the sentence) downloads `<set-id>.key.md` with every word you've finished in
   that set: one line per word giving its dictionary entry, part of speech, form and function, with
   links named by word number. A final JSON column preserves the parsing path, stem, stem type,

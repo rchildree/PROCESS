@@ -143,3 +143,41 @@ test('returning to an open page refreshes an older key with the teacher’s brea
   await waitFor(() => expect(screen.getByRole('button', { name: 'Review “īnstrūcta”' })).toBeTruthy())
   expect(loadLog(set.id, 0)).toEqual(log)
 }, 10000)
+
+test('teacher mode shows the key on a sentence the teacher has not parsed', async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} unobserve() {} })
+  setTeacher(true)
+  const filename = 'lesson-11-story-gladiator-aper.md'
+  const [set] = parseSetFile(filename, readFileSync(`sets/${filename}`, 'utf8'), (w) => lex().lookup(w).length > 0)
+  const key = parseKey(readFileSync('sets/lesson-11-story-gladiator-aper.key.md', 'utf8'))
+  const routes: Record<string, unknown> = {
+    './sets/index.json': [{ id: set.id, title: set.title, count: set.sentences.length, file: 'story.json', key: 'story.key.json' }],
+    './sets/story.json': set,
+    './sets/story.key.json': { setId: set.id, sentences: Object.fromEntries(key.sentences) },
+  }
+  vi.mocked(fetchDataset).mockResolvedValue(loadDatasetFromDir('public/data/knudsvig-731'))
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (!(url in routes)) throw new Error(`Unexpected fetch: ${url}`)
+    return { ok: true, json: async () => routes[url] }
+  }))
+  writeLast({ setId: set.id, i: 0 })
+  const { container } = render(<App />)
+  const toggle = await screen.findByRole('button', { name: 'Show the key' }, { timeout: 5000 })
+  const labels = () => [...container.querySelectorAll('.slot .fn:not(.comparison)')].map((el) => el.textContent)
+  expect(labels().every((l) => l === '')).toBe(true)
+
+  fireEvent.click(toggle)
+  expect(toggle.getAttribute('aria-pressed')).toBe('true')
+  expect(toggle.textContent).toBe('Hide the key')
+  expect(labels()).toContain('S')
+  expect(container.querySelectorAll('.slot.differs')).toHaveLength(0)
+  expect(screen.getByRole('status').textContent).toContain('haven’t parsed')
+  // Still on after a blur (unlike the students' hold button).
+  fireEvent(window, new Event('blur'))
+  expect(toggle.getAttribute('aria-pressed')).toBe('true')
+
+  fireEvent.click(toggle)
+  expect(toggle.getAttribute('aria-pressed')).toBe('false')
+  expect(labels().every((l) => l === '')).toBe(true)
+  expect(loadLog(set.id, 0)).toEqual([])
+}, 10000)

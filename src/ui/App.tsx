@@ -44,7 +44,7 @@ function TranslationBox({ setId, i }: { setId: string; i: number }) {
 }
 
 /** Press and hold (mouse, touch, or Space/Enter) to see the answer key; letting go shows your own work again. */
-function PeekButton({ on, onChange, diff }: { on: boolean; onChange: (on: boolean) => void; diff: number }) {
+function PeekButton({ on, onChange, note }: { on: boolean; onChange: (on: boolean) => void; note: string }) {
   const end = () => onChange(false)
   useEffect(() => {
     if (!on) return
@@ -75,11 +75,28 @@ function PeekButton({ on, onChange, diff }: { on: boolean; onChange: (on: boolea
       >
         {on ? 'Showing the key' : 'Hold to see the key'}
       </button>
-      <p className={on ? 'peek-note' : 'peek-note concealed'} role="status" aria-hidden={!on}>
-        {diff === 0 ? 'Your parse matches the key.' : `${diff} ${diff === 1 ? 'word differs' : 'words differ'} from yours (marked).`}
-      </p>
+      <p className={on ? 'peek-note' : 'peek-note concealed'} role="status" aria-hidden={!on}>{note}</p>
     </div>
   )
+}
+
+/** Teachers click to show or hide the key, on any sentence that has one. */
+function KeyToggle({ on, onChange, note }: { on: boolean; onChange: (on: boolean) => void; note: string }) {
+  return (
+    <div className="peek-row">
+      <button type="button" className={on ? 'peek on' : 'peek'} aria-pressed={on} onClick={() => onChange(!on)}>
+        {on ? 'Hide the key' : 'Show the key'}
+      </button>
+      <p className={on ? 'peek-note' : 'peek-note concealed'} role="status" aria-hidden={!on}>{note}</p>
+    </div>
+  )
+}
+
+function peekNote(diff: number, finished: boolean, parsed: number): string {
+  const n = `${diff} ${diff === 1 ? 'word differs' : 'words differ'}`
+  if (finished) return diff === 0 ? 'Your parse matches the key.' : `${n} from yours (marked).`
+  if (parsed === 0) return 'Showing the key. You haven’t parsed this sentence yet.'
+  return diff === 0 ? 'The words you’ve finished match the key.' : `${n} from the words you’ve finished (marked).`
 }
 
 export default function App() {
@@ -195,7 +212,8 @@ export default function App() {
     const base = replay(tokens, saved.log, lex)
     setSt(saved.editing && base.log.length === saved.log.length ? { ...base, editing: saved.editing } : base)
     setReviewing(null)
-    setPeek(false)
+    // A teacher's key toggle stays on from sentence to sentence.
+    if (!isTeacher()) setPeek(false)
     writeLast({ setId: set.id, i: sentence })
   }, [set, sentence, lex])
 
@@ -237,13 +255,22 @@ export default function App() {
   }
 
   const sentenceKey = sentence !== null ? answerKey?.get(sentence + 1) : undefined
-  const canPeek = !!st && st.step === 'done' && !st.editing && !!sentenceKey?.length
+  const finished = !!st && st.step === 'done' && !st.editing
+  // Students see the key once they finish; teachers can see it any time.
+  const canPeek = !!st && (finished || teacher) && !!sentenceKey?.length
   const peeking = canPeek && peek
-  const diff = useMemo(() => (canPeek && st && sentenceKey ? differences(st, sentenceKey) : new Set<number>()), [canPeek, st, sentenceKey])
+  const diff = useMemo(() => {
+    if (!canPeek || !st || !sentenceKey) return new Set<number>()
+    const all = differences(st, sentenceKey)
+    // Mid-sentence, only words already finished can disagree with the key.
+    return finished ? all : new Set([...all].filter((i) => st.words[i]?.done))
+  }, [canPeek, finished, st, sentenceKey])
   const keyed = useMemo(
-    () => (canPeek && st && sentenceKey ? { ...st, words: wordsWithKey(st.words, st.tokens, sentenceKey) } : null),
+    // Shown as a finished sentence, so unparsed words, the current-word marker and edit ghosts don't hide the key.
+    () => (canPeek && st && sentenceKey ? { ...st, step: 'done' as const, editing: null, openPP: null, words: wordsWithKey(st.words, st.tokens, sentenceKey) } : null),
     [canPeek, st, sentenceKey],
   )
+  const note = st ? peekNote(diff.size, finished, st.words.filter((w) => w.done).length) : ''
 
   const reviewable = useMemo(() => new Set(st?.trace.map((t) => t.word) ?? []), [st])
 
@@ -329,13 +356,18 @@ export default function App() {
             st={peeking && keyed ? keyed : st}
             peeking={peeking}
             marked={peeking ? diff : undefined}
-            compareWords={keyed ? (peeking ? st.words : keyed.words) : undefined}
+            compareWords={keyed && (finished || peeking) ? (peeking ? st.words : keyed.words) : undefined}
             reviewable={peeking ? undefined : reviewable}
             reviewing={peeking ? null : reviewing}
             onPickWord={peeking ? undefined : (i) => setReviewing(reviewing === i ? null : i)}
           />
           {reviewable.size > 0 && <p className={peeking ? 'sentence-hint concealed' : 'sentence-hint'} aria-hidden={peeking}>Click a word to see or change your answers.</p>}
-          {canPeek && <PeekButton on={peeking} onChange={(on) => { setPeek(on); if (on) setReviewing(null) }} diff={diff.size} />}
+          {canPeek && (() => {
+            const onChange = (on: boolean) => { setPeek(on); if (on) setReviewing(null) }
+            return teacher
+              ? <KeyToggle on={peeking} onChange={onChange} note={note} />
+              : <PeekButton on={peeking} onChange={onChange} note={note} />
+          })()}
           {st.step === 'done' && !st.editing && <TranslationBox key={`${set.id}:${sentence}`} setId={set.id} i={sentence} />}
           <Workbench
             st={st}
