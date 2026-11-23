@@ -6,6 +6,7 @@ import { tokenize, type SentenceSet } from '../../src/core/sets.ts'
 import { replay, startSession, submit, type Answer, type Role, type SessionState } from '../../src/core/session.ts'
 import type { NomForm } from '../../src/core/checks.ts'
 import { differences, keyFile, keyWords, parseKey, wordsWithKey } from '../../src/core/key.ts'
+import { detailsOf, labelOf } from '../../src/ui/summary.ts'
 
 const known = (w: string) => lex().lookup(w).length > 0
 const toks = (s: string) => tokenize(s, known)
@@ -44,8 +45,11 @@ const fugerunt: Answer[] = [
 ]
 
 const SUBJECT_FIRST = 'rēge victō, Bellovacī fūgērunt.'
+/** rēge as S, naming word `ptc` (from 0) as its participle. */
+const regeSubject = (ptc: number): Answer[] => [...rege({ kind: 'label', label: 'S' }), { step: 'subjectOf', target: ptc }]
+
 const SUBJECT_FIRST_LOG: Answer[] = [
-  ...rege({ kind: 'label', label: 'S', abs: true }),
+  ...regeSubject(1),
   ...victoStart, { step: 'nomRole', role: { kind: 'ablAbs', target: 0, idea: 'causal' } }, { step: 'clauseBoundary', ends: true },
   ...bellovaci, ...fugerunt,
 ]
@@ -101,37 +105,55 @@ describe('ablative absolute as a clause', () => {
     expect(st.step).toBe('done')
     expect(st.words.map((w) => w.clauseDepth)).toEqual([1, 1, 0, 0])
     const k = keyWords(st)
-    expect(k[0].fn).toBe('S; abl. abs.')
-    expect(k[1].fn).toBe('abl. abs. → 1 rēge; causal; clause ends')
+    expect(k[0].fn).toBe('S; abl. abs. → 2 victō')
+    expect(k[1].fn).toBe('V; abl. abs. → 1 rēge; causal; clause ends')
+  })
+  test('the participle is labeled V, and both halves end their details with abl. abs.', () => {
+    const st = play(SUBJECT_FIRST, SUBJECT_FIRST_LOG)
+    expect(labelOf(st, 0)).toBe('S')
+    expect(labelOf(st, 1)).toBe('V')
+    expect(detailsOf(st, 0).at(-1)).toEqual(['abl. abs.'])
+    expect(detailsOf(st, 1).at(-1)).toEqual(['abl. abs.'])
   })
   test('participle first: the participle opens the clause and its subject completes it', () => {
     const st = play('victō rēge, Bellovacī fūgērunt.', [
       ...victoStart, { step: 'nomRole', role: { kind: 'ablAbs', target: 1, idea: 'temporal' } },
-      ...rege({ kind: 'label', label: 'S', abs: true }), { step: 'clauseBoundary', ends: true },
+      // The participle already named rēge as its subject, so there is no "subject of which participle?" question.
+      ...rege({ kind: 'label', label: 'S' }), { step: 'clauseBoundary', ends: true },
       ...bellovaci, ...fugerunt,
     ])
     expect(st.step).toBe('done')
     expect(st.words.map((w) => w.clauseDepth)).toEqual([1, 1, 0, 0])
   })
-  test('an ablative is S only as the subject of an ablative absolute', () => {
-    expect(refused('rēge', rege({ kind: 'label', label: 'S' }).slice(0, 4), { step: 'nomRole', role: { kind: 'label', label: 'S' } })).toMatch(/ablative absolute/)
+  test('an ablative S is asked which participle it is the subject of', () => {
+    expect(play('rēge victō', rege({ kind: 'label', label: 'S' })).step).toBe('subjectOf')
   })
-  test('the subject of an ablative absolute must be ablative', () => {
-    expect(refused('Bellovacī', bellovaci.slice(0, 4), { step: 'nomRole', role: { kind: 'label', label: 'S', abs: true } })).toMatch(/ablative/)
+  test('a nominative S is not asked', () => {
+    expect(play('Bellovacī fūgērunt.', bellovaci).step).toBe('identify')
+  })
+  test('an ablative S must name a participle, not its own clause verb', () => {
+    expect(refused('rēge victō', rege({ kind: 'label', label: 'S' }), { step: 'subjectOf', target: null })).toMatch(/ablative absolute/)
+  })
+  test('the named word must be able to be an ablative participle', () => {
+    expect(refused('rēge fūgērunt.', rege({ kind: 'label', label: 'S' }), { step: 'subjectOf', target: 1 })).toMatch(/participle/)
+  })
+  test('the participle the subject named must be the one that answers', () => {
+    expect(refused('rēge victō captō', [...regeSubject(2), ...victoStart],
+      { step: 'nomRole', role: { kind: 'ablAbs', target: 0, idea: 'causal' } })).toMatch(/named another word/)
+  })
+  test('the named participle must be parsed as the ablative absolute', () => {
+    expect(refused(SUBJECT_FIRST, [...regeSubject(1), ...victoStart.slice(0, 1)], { step: 'pos', pos: 'V' })).toMatch(/participle/)
+    expect(refused(SUBJECT_FIRST, [...regeSubject(1), ...victoStart],
+      { step: 'nomRole', role: { kind: 'modifies', target: 0 } })).toMatch(/ablative absolute/)
   })
   test('the clause cannot end before its participle', () => {
-    expect(refused('rēge Bellovacī fūgērunt.', [...rege({ kind: 'label', label: 'S', abs: true }), ...bellovaci], { step: 'clauseBoundary', ends: true }))
-      .toMatch(/no participle/)
+    expect(refused('rēge Bellovacī victō', [...regeSubject(2), ...bellovaci], { step: 'clauseBoundary', ends: true })).toMatch(/no participle/)
   })
   test('no finite verb inside an ablative absolute', () => {
-    expect(refused('rēge fūgērunt.', [...rege({ kind: 'label', label: 'S', abs: true }), ...fugerunt.slice(0, 6)], fugerunt[6])).toMatch(/no finite verb/)
-  })
-  test('a participle agreeing with the open subject must be the ablative absolute', () => {
-    expect(refused(SUBJECT_FIRST, [...rege({ kind: 'label', label: 'S', abs: true }), ...victoStart],
-      { step: 'nomRole', role: { kind: 'circumstantial', target: 0, idea: 'causal' } })).toMatch(/ablative absolute/)
+    expect(refused('rēge fūgērunt victō', [...regeSubject(2), ...fugerunt.slice(0, 6)], fugerunt[6])).toMatch(/no finite verb/)
   })
   test('the participle must point at the open subject', () => {
-    expect(refused(SUBJECT_FIRST, [...rege({ kind: 'label', label: 'S', abs: true }), ...victoStart],
+    expect(refused(SUBJECT_FIRST, [...regeSubject(1), ...victoStart],
       { step: 'nomRole', role: { kind: 'ablAbs', target: 2, idea: 'causal' } })).toBeTruthy()
   })
 })
@@ -146,6 +168,7 @@ describe('keys', () => {
     expect(differences(st, words).size).toBe(0)
     const shown = wordsWithKey(st.words, set.sentences[0].tokens, words)
     expect(shown[0].role).toEqual({ kind: 'label', label: 'S', abs: true })
+    expect(shown[0].subjectOf).toBe(1)
     expect(shown[1].role).toEqual({ kind: 'ablAbs', target: 0, idea: 'causal' })
     expect(shown.map((w) => w.clauseDepth)).toEqual([1, 1, 0, 0])
   })

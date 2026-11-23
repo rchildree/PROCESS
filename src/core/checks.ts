@@ -64,14 +64,8 @@ export function checkNomForm(lex: Lexicon, surface: string, entryId: string, f: 
   return no(`This form cannot be ${CASE_NAME[f.c]} ${f.n === 'sg' ? 'singular' : 'plural'}.`)
 }
 
-/** `abs`: the word is the subject (S) of an ablative absolute, so it must be an ablative S. */
-export function checkNounLabel(f: NomForm, label: Label, openPP: { case: Case; soft?: boolean } | null, abs = false): Check {
+export function checkNounLabel(f: NomForm, label: Label, openPP: { case: Case; soft?: boolean } | null): Check {
   if (!NOUN_LABELS.includes(label)) return no('That label is not for nouns.')
-  if (abs) {
-    if (label !== 'S') return no('Only S can be the subject of an ablative absolute.')
-    return f.c === 'abl' ? yes : no('The subject of an ablative absolute is in the ablative.')
-  }
-  if (label === 'S' && f.c === 'abl') return no('An ablative can be S only as the subject of an ablative absolute: choose “S (abl. abs.)”.')
   if (openPP && !openPP.soft && f.c === openPP.case && label !== 'PP') return no('This word is in the case the preposition takes.')
   if (label === 'PP') {
     if (!openPP) return no('There is no preposition for this word to belong to.')
@@ -80,7 +74,8 @@ export function checkNounLabel(f: NomForm, label: Label, openPP: { case: Case; s
   }
   // Outside the kernel (e.g. ūnō diē): any case may take it.
   if (label === '——') return yes
-  const fits: Partial<Record<Case, Label[]>> = { nom: ['S', 'SC'], acc: ['O', 'OC'], abl: ['ADV'], loc: ['ADV'] }
+  // An ablative S is the subject of an ablative absolute (it then names its participle).
+  const fits: Partial<Record<Case, Label[]>> = { nom: ['S', 'SC'], acc: ['O', 'OC'], abl: ['ADV', 'S'], loc: ['ADV'] }
   const allowed = fits[f.c]
   if (!allowed) return yes // genitive, dative, vocative: no labels yet
   return allowed.includes(label) ? yes : no(`A ${CASE_NAME[f.c]} cannot be ${label}.`)

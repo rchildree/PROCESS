@@ -131,7 +131,7 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
     case 'nomRole': {
       if (isRelative(w)) {
         title = 'What is its function in its own clause?'
-        body = <RoleStep {...row} kind="noun" relative options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
+        body = <RoleStep {...row} kind="noun" options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
         break
       }
       const kind = w.pos === 'N' ? 'noun' : w.pos === 'ADV' ? 'adverb' : w.pos === 'PRO' ? 'pronoun' : w.pos === 'PTC' ? 'participle' : 'adjective'
@@ -211,6 +211,21 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
       title = 'Completes what finite verb?'
       body = <WordRow {...row} onPick={(target) => onAnswer({ step: 'completes', target })} />
       break
+    case 'subjectOf': {
+      const abl = w.nomForm?.c === 'abl'
+      title = abl ? 'Subject of which participle? (ablative absolute)' : 'Subject of which verb?'
+      body = (
+        <div className="roles">
+          <WordRow {...row} onPick={(target) => onAnswer({ step: 'subjectOf', target })} />
+          {!abl && (
+            <div className="choices">
+              <button type="button" onClick={() => onAnswer({ step: 'subjectOf', target: null })}>the verb of its own clause (not an ablative absolute)</button>
+            </div>
+          )}
+        </div>
+      )
+      break
+    }
     case 'ppPrep':
       title = 'With which preposition?'
       body = <WordRow {...row} onPick={(target) => onAnswer({ step: 'ppPrep', target })} />

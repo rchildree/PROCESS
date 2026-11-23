@@ -26,7 +26,8 @@ export function labelOf(st: SessionState, i: number, words: WordState[] = st.wor
       // A non-kernel word (——) gets no label at all.
       case 'label': case 'substantive': case 'predicate': label = r.label === '——' ? '' : r.label; break
       case 'modifies': case 'circumstantial': label = ''; break
-      case 'ablAbs': label = 'abl. abs.'; break
+      // The participle is the verb of its ablative absolute.
+      case 'ablAbs': label = 'V'; break
       case 'verbPart': case 'aux': {
         const cp = findCompound({ ...st, words }, i)
         label = cp?.label ?? '…'
@@ -66,13 +67,15 @@ export function detailsOf(st: SessionState, i: number, words: WordState[] = st.w
   if (r?.kind === 'modifies') lines.push(['→ ', la(r.target)])
   if (r?.kind === 'circumstantial') lines.push(['→ ', la(r.target)], [r.idea])
   if (r?.kind === 'ablAbs') lines.push(['subj. ', la(r.target)], [r.idea])
-  if ((r?.kind === 'label' || r?.kind === 'substantive') && r.abs) lines.push(['abl. abs.'])
+  if (w.subjectOf !== undefined) lines.push(['verb ', la(w.subjectOf)])
   if (r?.kind === 'substantive') lines.push(['subst.'])
   if (r?.kind === 'predicate') lines.push(['pred.'])
   if (r?.kind === 'verbPart' || r?.kind === 'aux') lines.push(['+ ', la(r.target)])
   if (w.compound?.form) lines.push([verbText(w.compound.form)])
   if (w.completes !== undefined) lines.push(['→ ', la(w.completes)])
   if (w.enclitic?.done) lines.push([{ la: `-${st.tokens[i].enclitic}` }])
+  // Both halves of an ablative absolute (its subject and its participle) say so last.
+  if (r?.kind === 'ablAbs' || ((r?.kind === 'label' || r?.kind === 'substantive') && r.abs)) lines.push(['abl. abs.'])
   return lines
 }
 
@@ -83,7 +86,7 @@ export const STEP_NAME: Record<StepId, string> = {
   personal: 'Personal ending', stem: 'Stem', stemType: 'Stem type', infEnding: 'Ending', verbForm: 'Verb form', verbRole: 'Function',
   relNG: 'Number, gender', antecedent: 'Antecedent', relCase: 'Case', compoundForm: 'Compound verb form', compoundRole: 'Compound verb label',
   prepCase: 'Case it takes', conjType: 'Conjunction type', clauseBoundary: 'Clause end',
-  encliticPos: 'Enclitic part of speech', encliticConj: 'Enclitic type', sumUse: 'On its own or part of a verb', completes: 'Completes', ppPrep: 'Preposition', done: '',
+  encliticPos: 'Enclitic part of speech', encliticConj: 'Enclitic type', sumUse: 'On its own or part of a verb', completes: 'Completes', ppPrep: 'Preposition', subjectOf: 'Subject of', done: '',
 }
 
 function roleText(r: Role, word: (j: number) => string): string {
@@ -115,6 +118,7 @@ export function describeAnswer(a: Answer, st: SessionState, lex: Lexicon): strin
     case 'sumUse': return a.target === null ? 'on its own' : `part of a verb with ${word(a.target)}`
     case 'completes': return word(a.target)
     case 'ppPrep': return word(a.target)
+    case 'subjectOf': return a.target === null ? 'the verb of its own clause' : `${word(a.target)} (ablative absolute)`
     case 'conjType': case 'encliticConj': return a.t === '+' ? '+ coordinating' : '↓ subordinating'
     case 'clauseBoundary': return a.ends ? 'clause ends here' : 'clause continues'
   }

@@ -27,6 +27,8 @@ function linksOf(words: WordState[]): Link[] {
     // A link to a later word stays provisional (dashed, with a ?) until that word is finished and the link checked.
     if (r && 'target' in r && r.target > i && !words[r.target]?.done) out.push({ from: i, to: r.target, kind: 'pending' })
     else if (r?.kind === 'modifies' || r?.kind === 'circumstantial' || r?.kind === 'ablAbs') out.push({ from: i, to: r.target, kind: 'mod' })
+    // The subject of an ablative absolute names its later participle; once that is done, the participle's arrow shows the link.
+    if (w.subjectOf !== undefined && w.subjectOf > i && !words[w.subjectOf]?.done) out.push({ from: i, to: w.subjectOf, kind: 'pending' })
     if (w.completes !== undefined) {
       const t = w.completes
       out.push({ from: i, to: t, kind: t > i && !words[t]?.done ? 'pending' : 'mod' })

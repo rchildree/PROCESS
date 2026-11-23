@@ -58,14 +58,14 @@ export function keyWords(st: SessionState): KeyWord[] {
         case 'predicate': fn.push(`pred. ${r.label}`); break
         case 'modifies': fn.push(`→ ${ref(r.target)}`); break
         case 'circumstantial': fn.push(`→ ${ref(r.target)}`, r.idea); break
-        case 'ablAbs': fn.push(`abl. abs. → ${ref(r.target)}`, r.idea); break
+        case 'ablAbs': fn.push('V', `abl. abs. → ${ref(r.target)}`, r.idea); break
         case 'verbPart': case 'aux': {
           const cp = findCompound(st, i)
           fn.push(`${cp?.label ?? '?'} with ${ref(r.target)}`)
           break
         }
       }
-      if (isAbsSubject(r)) fn.push('abl. abs.')
+      if (isAbsSubject(r)) fn.push(w.subjectOf !== undefined ? `abl. abs. → ${ref(w.subjectOf)}` : 'abl. abs.')
     }
     if (w.antecedent !== undefined) fn.push(w.antecedent === null ? 'rel. none' : `rel. → ${ref(w.antecedent)}`)
     if (w.completes !== undefined) fn.push(`completes ${ref(w.completes)}`)
@@ -181,7 +181,11 @@ function keyWordState(k: KeyWord): WordState {
   let abs = false
   for (const f of parts(k.fn)) {
     let m: RegExpMatchArray | null
-    if ((m = f.match(/^abl\. abs\. → (\d+)/))) role = { kind: 'ablAbs', target: target(m[1]), idea: 'temporal' }
+    // The participle points at its subject; the subject (any other part of speech) points at its participle.
+    if ((m = f.match(/^abl\. abs\. → (\d+)/))) {
+      if (k.pos === 'PTC') role = { kind: 'ablAbs', target: target(m[1]), idea: 'temporal' }
+      else { abs = true; w.subjectOf = target(m[1]) }
+    }
     else if (f === 'abl. abs.') abs = true
     else if (IDEAS.includes(f as Idea)) idea = f as Idea
     else if ((m = f.match(/^→ (\d+)/))) role = { kind: 'modifies', target: target(m[1]) }

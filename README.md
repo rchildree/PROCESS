@@ -63,12 +63,15 @@ V or ADJ. After its ending, stem and case, the student chooses what it does:
 - **ablative absolute**: it is the verb of its own clause, with the same four ideas;
 - or one of the other uses: substantive, predicate, or part of a verb with a form of *sum*.
 
-An ablative absolute is parsed as a clause. Its ablative noun takes **S (abl. abs.)**, offered wherever S is;
-a plain S on an ablative is refused. Whichever of the subject and the participle comes first opens the
-clause; words inside take their usual labels (O, PP, ——), no finite verb may appear inside, and the clause
-can end only once it has both its subject and its participle. In a key file this reads `S; abl. abs.` for
-the subject, `abl. abs. → 1 rēge; causal` for the participle, and `→ 1 Bellovacī; causal` for a
-circumstantial participle. Older saved work and keys that called a participle V are read as PTC.
+An ablative absolute is parsed as a clause. Its ablative noun is labeled plain **S**; an ablative S then
+asks **Subject of which participle?** and the student picks the participle (a link forward, like PP's
+preposition or CINF's verb). A glossed name has no case to check, so its S asks **Subject of which verb?**,
+with "the verb of its own clause" for an ordinary subject. When the participle comes first
+(*acceptīs obsidibus*), it names its subject and the question is skipped. Whichever of the two comes first
+opens the clause; words inside take their usual labels (O, PP, ——), no finite verb may appear inside, and
+the clause can end only once it has both. The participle is labeled **V**, and both words end their details
+with *abl. abs.* In a key file the subject reads `S; abl. abs. → 2 victō`, the participle
+`V; abl. abs. → 1 rēge; causal`, and a circumstantial participle `→ 1 Bellovacī; causal`. Older saved work and keys that called a participle V are read as PTC.
 
 Sentences are worked in order: a student can open any sentence they've finished plus the first
 unfinished one, never one further ahead.

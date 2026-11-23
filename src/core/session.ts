@@ -13,14 +13,14 @@ export type StepId =
   | 'identify' | 'pos' | 'ending' | 'nomForm' | 'nomRole' | 'personal' | 'stem' | 'stemType' | 'infEnding' | 'verbForm' | 'verbRole'
   | 'relNG' | 'antecedent' | 'relCase'
   | 'compoundForm' | 'compoundRole' | 'prepCase' | 'conjType' | 'clauseBoundary' | 'encliticPos'
-  | 'encliticConj' | 'sumUse' | 'completes' | 'ppPrep' | 'done'
+  | 'encliticConj' | 'sumUse' | 'completes' | 'ppPrep' | 'subjectOf' | 'done'
 
 /** The clause idea a circumstantial participle or an ablative absolute adds to its sentence. */
 export type Idea = 'temporal' | 'causal' | 'concessive' | 'conditional'
 export const IDEAS: Idea[] = ['temporal', 'causal', 'concessive', 'conditional']
 
 export type Role =
-  /** `abs`: the subject (S) of an ablative absolute, which opens or completes that clause. */
+  /** `abs`: the subject (S) of an ablative absolute. Set by the app once the S names its participle, never chosen directly. */
   | { kind: 'label'; label: Label; abs?: true }
   /** For a participle: attributive (adjectival). */
   | { kind: 'modifies'; target: number }
@@ -55,6 +55,8 @@ export type Answer =
   | { step: 'completes'; target: number }
   /** A word labeled PP: the preposition it goes with. */
   | { step: 'ppPrep'; target: number }
+  /** An ablative (or glossed) S: the participle it is the subject of, in an ablative absolute; null = its own clause's verb. */
+  | { step: 'subjectOf'; target: number | null }
 
 export interface Compound { ptc: number; sum: number; form?: VerbForm; label?: Label }
 
@@ -83,6 +85,8 @@ export interface WordState {
   completes?: number
   /** A word labeled PP: the preposition it goes with. */
   ppWith?: number
+  /** The subject of an ablative absolute: its participle. */
+  subjectOf?: number
   enclitic?: { pos?: UiPos; conjType?: '+' | '↓'; done: boolean }
   clauseDepth: number
   done: boolean
@@ -168,7 +172,7 @@ export function isNounLike(w: WordState): boolean {
   return w.role.kind === 'label' && (w.pos === 'N' || w.pos === 'PRO')
 }
 
-export interface IncomingLink { from: number; kind: 'noun' | 'abs' | 'sum' | 'ptc' | 'cinf' }
+export interface IncomingLink { from: number; kind: 'noun' | 'abs' | 'absVerb' | 'sum' | 'ptc' | 'cinf' }
 
 /** Is this role the subject of an ablative absolute? */
 export const isAbsSubject = (r?: Role): r is Extract<Role, { kind: 'label' | 'substantive' }> => !!r && (r.kind === 'label' || r.kind === 'substantive') && !!r.abs
@@ -191,6 +195,7 @@ export function incomingLinks(st: SessionState, j: number): IncomingLink[] {
     if (r.kind === 'aux') out.push({ from, kind: 'ptc' })
   })
   st.words.forEach((x, from) => { if (from < j && x.completes === j) out.push({ from, kind: 'cinf' }) })
+  st.words.forEach((x, from) => { if (from < j && x.subjectOf === j) out.push({ from, kind: 'absVerb' }) })
   return out
 }
 
@@ -201,7 +206,10 @@ const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
 function checkIncomingNoun(st: SessionState, i: number): string | null {
   const w = st.words[i]
   for (const l of incomingLinks(st, i)) {
-    if (l.kind === 'abs' && !isAbsSubject(w.role)) return `${quoted(st, l.from)} was linked to this word as the subject of its ablative absolute: choose “S (abl. abs.)”.`
+    if (l.kind === 'absVerb' && !(w.role?.kind === 'ablAbs' && w.role.target === l.from)) {
+      return `${quoted(st, l.from)} was linked to this word as the participle it is the subject of: choose “ablative absolute” with ${quoted(st, l.from)}.`
+    }
+    if (l.kind === 'abs' && !isAbsSubject(w.role)) return `${quoted(st, l.from)} was linked to this word as the subject of its ablative absolute: label it S.`
     if (l.kind !== 'noun' && l.kind !== 'abs') continue
     if (!isNounLike(w)) return `${quoted(st, l.from)} was linked to this word as its noun, but it is not used as a noun here.`
     const f = st.words[l.from].nomForm
@@ -320,6 +328,14 @@ function afterNomRole(st: SessionState, i: number): SessionState {
   return finishWord(st)
 }
 
+/** An S whose case is ablative, or unknown (a glossed word), may be the subject of an ablative absolute. */
+function asksSubjectOf(st: SessionState, i: number): boolean {
+  const w = st.words[i]
+  const r = w.role
+  if (!r || (r.kind !== 'label' && r.kind !== 'substantive') || r.label !== 'S' || isRelative(w)) return false
+  return w.nomForm ? w.nomForm.c === 'abl' : isGloss(w.entryId)
+}
+
 function openClause(st: SessionState, i: number, c: Clause): SessionState {
   const clauses = [...st.clauses, c]
   return withWord({ ...st, clauses }, i, { clauseDepth: clauses.length })
@@ -342,10 +358,7 @@ function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon)
     return role.kind === 'label' && role.label === 'ADV' ? { ok: true } : no('An adverb is labeled ADV.')
   }
   if (isRelative(w) && role.kind !== 'label') return no('Give the relative pronoun its function in its own clause.')
-  if (isAbsSubject(role)) {
-    if (isRelative(w)) return no('A relative pronoun cannot be the subject of an ablative absolute here.')
-    if (role.label !== 'S') return no('Only S can be the subject of an ablative absolute.')
-  }
+  if (isRelative(w) && role.kind === 'label' && role.label === 'S' && form?.c === 'abl') return no('A relative pronoun in the ablative is not a subject here.')
   const isPtc = w.pos === 'PTC'
   if ((role.kind === 'circumstantial' || role.kind === 'ablAbs') && !isPtc) return no('Only a participle can do that.')
   if (isPtc && (role.kind === 'modifies' || role.kind === 'circumstantial')) {
@@ -358,11 +371,11 @@ function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon)
       if (w.pos === 'ADJ') return no('Say what this adjective does: does it modify a noun, stand as a noun, or act as a predicate?')
       if (isPtc) return no('Say what this participle does: does it modify a noun, form an ablative absolute, or stand as a noun?')
       if (gloss) return NOUN_LABELS.includes(role.label) ? { ok: true } : no('That label is not for nouns.')
-      return form ? checkNounLabel(form, role.label, openPP, !!role.abs) : no('Missing case.')
+      return form ? checkNounLabel(form, role.label, openPP) : no('Missing case.')
     case 'substantive':
       if (w.pos === 'N') return no('A noun is already a noun — just give its label.')
       if (gloss) return { ok: true }
-      return form ? checkNounLabel(form, role.label, openPP, !!role.abs) : no('Missing case.')
+      return form ? checkNounLabel(form, role.label, openPP) : no('Missing case.')
     case 'predicate': {
       if (w.pos === 'N') return no('Give the noun its label (SC or OC) directly.')
       if (!form) return no('Missing case.')
@@ -373,6 +386,8 @@ function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon)
       if (role.target < i) {
         const abs = openAbs(st)?.abs
         if (!abs || abs.subject !== role.target || abs.verb !== undefined) return no('That word is not the subject of an open ablative absolute.')
+        const named = st.words[role.target].subjectOf
+        if (named !== undefined && named !== i) return no(`${quoted(st, role.target)} named another word as its participle.`)
       }
       return checkAgreesWith(st, i, role.target, lex)
     case 'circumstantial':
@@ -515,6 +530,8 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       const asVerb = incomingLinks(st, i).find((l) => l.kind === 'sum' || l.kind === 'ptc')
       // A participle linked to a form of sum points at a verb; a form of sum linked to a participle points at a participle.
       if (asVerb?.kind === 'sum' && a.pos !== 'V') return fail(st, `${quoted(st, asVerb.from)} was linked to this word as part of a verb.`)
+      const asAbsVerb = incomingLinks(st, i).find((l) => l.kind === 'absVerb')
+      if (asAbsVerb && a.pos !== 'PTC') return fail(st, `${quoted(st, asAbsVerb.from)} was linked to this word as the participle it is the subject of.`)
       if (asVerb?.kind === 'ptc' && a.pos !== 'PTC') return fail(st, `${quoted(st, asVerb.from)} was linked to this word as the participle of a verb.`)
       const asFinite = incomingLinks(st, i).find((l) => l.kind === 'cinf')
       if (asFinite && a.pos !== 'V') return fail(st, `${quoted(st, asFinite.from)} was linked to this word as the finite verb it completes.`)
@@ -625,13 +642,40 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
     }
 
     case 'nomRole': {
-      const c = checkNominalRole(st, i, a.role, lex)
+      // The ablative absolute's subject is marked by the subjectOf step, never chosen with the label.
+      const role: Role = a.role.kind === 'label' && a.role.abs ? { kind: 'label', label: a.role.label }
+        : a.role.kind === 'substantive' && a.role.abs ? { kind: 'substantive', label: a.role.label } : a.role
+      const c = checkNominalRole(st, i, role, lex)
       if (!c.ok) return fail(st, c.reason)
-      st = withWord(st, i, { role: a.role })
+      st = withWord(st, i, { role })
+      if (asksSubjectOf(st, i)) {
+        // The participle came first and already named this word as its subject: no need to ask.
+        const ptc = incomingLinks(st, i).find((l) => l.kind === 'abs')
+        if (ptc) return afterNomRole(withWord(st, i, { role: { ...(role as Extract<Role, { kind: 'label' | 'substantive' }>), abs: true }, subjectOf: ptc.from }), i)
+        return { ...st, step: 'subjectOf' }
+      }
       if (a.role.kind === 'verbPart') return finishWord(withWord(st, i, { compound: { ptc: i, sum: a.role.target } }))
       // With -cum the preposition is part of this word, so there is none to pick.
       if ((a.role.kind === 'label' || a.role.kind === 'substantive') && a.role.label === 'PP' && tok.enclitic !== 'cum') return { ...st, step: 'ppPrep' }
       return afterNomRole(st, i)
+    }
+
+    case 'subjectOf': {
+      const w2 = st.words[i]
+      const r = w2.role as Extract<Role, { kind: 'label' | 'substantive' }>
+      if (a.target === null) {
+        if (w2.nomForm?.c === 'abl') return fail(st, 'An ablative is S only in an ablative absolute: pick its participle.')
+        return afterNomRole(st, i)
+      }
+      const t = a.target
+      if (!st.tokens[t] || t === i) return fail(st, 'Choose another word in the sentence.')
+      if (t < i) return fail(st, 'Its participle comes later in the sentence; pick that word.')
+      const later = surfaceOf(st.tokens[t])
+      const cands = lex.lookup(later)
+      // A glossed or unknown word cannot be checked yet; a known one must have an ablative participle reading.
+      const can = !cands.length || cands.some((c) => !c.analyses.length || c.analyses.some((x) => x.k === 'ptc' && x.c === 'abl'))
+      if (!can) return fail(st, 'That word cannot be a participle in the ablative.')
+      return afterNomRole(withWord(st, i, { role: { ...r, abs: true }, subjectOf: t }), i)
     }
 
     case 'ppPrep': {

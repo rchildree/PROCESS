@@ -76,15 +76,18 @@ test('the part-of-speech step offers Participle', () => {
   expect(screen.getByRole('button', { name: 'Participle' })).toBeTruthy()
 })
 
-test('a noun can be chosen as the subject of an ablative absolute', () => {
+test('an ablative S then picks the participle it is the subject of', () => {
   const got: Answer[] = []
-  render(<Workbench st={at('rēge victō', rege)} lex={lex()} onAnswer={(a) => got.push(a)} />)
-  fireEvent.click(screen.getByRole('button', { name: /S \(abl\. abs\.\)/ }))
-  expect(got).toEqual([{ step: 'nomRole', role: { kind: 'label', label: 'S', abs: true } }])
+  render(<Workbench st={at('rēge victō', [...rege, { step: 'nomRole', role: { kind: 'label', label: 'S' } }])} lex={lex()} onAnswer={(a) => got.push(a)} />)
+  expect(screen.getByRole('heading', { name: 'Subject of which participle? (ablative absolute)' })).toBeTruthy()
+  // An ablative S has no "own clause" choice: only a participle will do.
+  expect(screen.queryByRole('button', { name: /own clause/ })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'victō' }))
+  expect(got).toEqual([{ step: 'subjectOf', target: 1 }])
 })
 
 test('a participle picks its use, then the clause idea, then its noun', () => {
-  const st = at('rēge victō', [...rege, { step: 'nomRole', role: { kind: 'label', label: 'S', abs: true } }, ...victo])
+  const st = at('rēge victō', [...rege, { step: 'nomRole', role: { kind: 'label', label: 'S' } }, { step: 'subjectOf', target: 1 }, ...victo])
   const got: Answer[] = []
   render(<Workbench st={st} lex={lex()} onAnswer={(a) => got.push(a)} />)
   expect(screen.getByRole('heading', { name: 'What does the participle do?' })).toBeTruthy()

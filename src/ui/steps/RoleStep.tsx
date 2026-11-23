@@ -5,8 +5,6 @@ import { IDEAS, type Idea, type Options, type Role } from '../../core/session.ts
 interface Props {
   /** 'noun' = label only; 'adjective' = adjective roles; 'pronoun' = both; 'participle' = participle roles; 'adverb'; 'verb'. */
   kind: 'noun' | 'adjective' | 'pronoun' | 'participle' | 'adverb' | 'verb'
-  /** A relative pronoun: its own clause's label only, never the subject of an ablative absolute. */
-  relative?: boolean
   options: Options
   wordAt: (i: number) => string
   /** The current word's place in the sentence, and the sentence's length, for picking a linked word. */
@@ -26,18 +24,6 @@ function Labels({ labels, onPick }: { labels: Label[]; onPick: (l: Label) => voi
           <span className="choice-hint">{labelName(l)}</span>
         </button>
       ))}
-    </div>
-  )
-}
-
-/** The subject of an ablative absolute: an ablative S that opens (or completes) that clause. */
-function AbsSubject({ onPick }: { onPick: () => void }) {
-  return (
-    <div className="choices labels">
-      <button type="button" onClick={onPick} title="subject of an ablative absolute">
-        <span className="choice-label">S (abl. abs.)</span>
-        <span className="choice-hint">subject of an ablative absolute</span>
-      </button>
     </div>
   )
 }
@@ -85,7 +71,7 @@ function PickWord({ heading, here, count, wordAt, onPick, onBack }: {
 }
 export { PickWord }
 
-export function RoleStep({ kind, relative, options, wordAt, here, count, onRole }: Props) {
+export function RoleStep({ kind, options, wordAt, here, count, onRole }: Props) {
   const [sub, setSub] = useState<'substantive' | 'sum' | null>(null)
   const [idea, setIdea] = useState<{ use: 'circumstantial' | 'ablAbs'; idea: Idea } | null>(null)
 
@@ -109,7 +95,6 @@ export function RoleStep({ kind, relative, options, wordAt, here, count, onRole 
     return (
       <div className="roles">
         <Labels labels={NOUN_LABELS} onPick={(label) => onRole({ kind: 'label', label })} />
-        {!relative && <AbsSubject onPick={() => onRole({ kind: 'label', label: 'S', abs: true })} />}
       </div>
     )
   }
@@ -119,7 +104,6 @@ export function RoleStep({ kind, relative, options, wordAt, here, count, onRole 
       <div className="roles">
         <h4>Used as a noun. What is its function?</h4>
         <Labels labels={NOUN_LABELS} onPick={(label) => onRole({ kind: 'substantive', label })} />
-        <AbsSubject onPick={() => onRole({ kind: 'substantive', label: 'S', abs: true })} />
         <button type="button" className="link" onClick={() => setSub(null)}>← back</button>
       </div>
     )
@@ -159,7 +143,6 @@ export function RoleStep({ kind, relative, options, wordAt, here, count, onRole 
         <section>
           <h4>Stands alone (as a noun): its function</h4>
           <Labels labels={NOUN_LABELS} onPick={(label) => onRole({ kind: 'label', label })} />
-          <AbsSubject onPick={() => onRole({ kind: 'label', label: 'S', abs: true })} />
         </section>
       )}
       <section>
