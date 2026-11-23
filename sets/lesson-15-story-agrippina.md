@@ -20,14 +20,20 @@ construction, by type, by the noun it goes with, and by the clause idea it sugge
 
 ### Latin
 
-Claudiō Rōmam regente, Agrippīna, fēmina magnā avāritiā affecta, cum eō in urbe vīxit. Agrippīna, Nerōnem puerum suum plūrimum amāns, vīrēs magnās per eum habēre cupīvit; Claudius autem etiam puerum suum, Britannicum, habuit. Agrippīnā saepe premente, Claudius Nerōnem in domum suam accēpit. Nerōne acceptō, Britannicus, puer parvus et inops, ā patre neglēctus est. tum Agrippīna avāritiā ducta venēnō in vīnum fūsō Claudium interfēcit. Claudiō interfectō, Nerō ā mātre adiūtus Rōmam regere incēpit. prīmum, Nerōne mātrem audiente, Agrippīna magnās vīrēs habuit et multa in urbe ēgit. mox autem, mātre omnia agente, Nerō īrā affectus est, et Agrippīna ab eō ē domō missa est. Agrippīna hāc rē irrītāta Nerōnem verbīs malīs pressit et Britannicum adiuvāre incēpit. Nerō, magnum perīculum in frātre vidēns, eum etiam venēnō interfēcit. venēnō Britannicum ante multōs hominēs statim vincente, Agrippīna, vēritātem cognōscēns, intus multum doluit. post quattuor annōs Nerō, mātrem interficere cupiēns, eam ad mare vocāvit. nocte, stēllīs lūcem dantibus, Agrippīna ā virīs ā Nerōne missīs in mare iacta est. Agrippīna autem, marī nōn victa, ex aquā fortiter fūgit et, nocte vānēscente, domum vēnit. hāc rē cognitā, Nerō, magnā īrā affectus, virōs crūdēlēs ad mātrem mīsit. virīs domum intrantibus, Agrippīna, nōn timida sed fortis, statim interfecta est. Nerō, mātre sepultā, novem annōs Rōmam rēxit; sed saepe nocte, ē somnō excitātus, mātrem facēs in manibus tenentem vīdit.
+Claudiō Rōmam regente, Agrippīna, fēmina magnā avāritiā affecta, cum eō in urbe vīxit. Agrippīna, Nerōnem puerum suum plūrimum amāns, vīrēs magnās per eum habēre cupīvit; Claudius autem etiam puerum suum, Britannicum, habuit. Agrippīnā saepe premente, Claudius Nerōnem in domum suam accēpit. Nerōne acceptō, Britannicus, puer parvus et inops, ā patre neglēctus est. tum Agrippīna avāritiā ducta venēnō in vīnum fūsō Claudium interfēcit. Claudiō interfectō, Nerō ā mātre adiūtus Rōmam regere incēpit. prīmum, Nerōne mātrem audiente, Agrippīna magnās vīrēs habuit et multa in urbe ēgit. mox autem, mātre omnia agente, Nerō īrā affectus est, et Agrippīna ab eō extrā domum missa est. Agrippīna hāc rē irrītāta Nerōnem verbīs malīs pressit et Britannicum adiuvāre incēpit. Nerō, magnum perīculum in frātre vidēns, eum etiam venēnō interfēcit. venēnō Britannicum ante multōs hominēs statim vincente, Agrippīna, vēritātem cognōscēns, intus multum doluit. post quattuor annōs Nerō, cōnsilium crūdēle contrā mātrem capiēns, eam ad mare vocāvit. nocte, stēllīs lūcem dantibus, Agrippīna ā virīs ā Nerōne missīs in mare iacta est. Agrippīna autem, marī nōn victa, ex aquā fortiter fūgit et, nocte vānēscente, domum vēnit. hāc rē cognitā, Nerō, magnā īrā affectus, virōs crūdēlēs ad mātrem mīsit. virīs domum intrantibus, Agrippīna, nōn timida sed fortis, statim interfecta est. Nerō, mātre sepultā, novem annōs Rōmam rēxit; sed saepe nocte, ē somnō excitātus, mātrem facēs in manibus tenentem vīdit.
 
-**Names** (not in the lesson vocabulary)
-
-- Agrippīna –ae f. *Agrippina the Younger, mother of Nero*
-- Nerō Nerōnis m. *Nero, emperor AD 54–68*
-- Claudius –ī m. *Claudius, emperor AD 41–54, Agrippina's husband*
-- Britannicus –ī m. *Britannicus, Claudius' son*
+glosses:
+Agrippīna | Agrippīna –ae f. | Agrippina | n
+Agrippīnā | Agrippīna –ae f. | Agrippina | n
+Nerō | Nerō Nerōnis m. | Nero | n
+Nerōnem | Nerō Nerōnis m. | Nero | n
+Nerōne | Nerō Nerōnis m. | Nero | n
+Claudius | Claudius –ī m. | Claudius | n
+Claudium | Claudius –ī m. | Claudius | n
+Claudiō | Claudius –ī m. | Claudius | n
+Britannicus | Britannicus –ī m. | Britannicus | n
+Britannicum | Britannicus –ī m. | Britannicus | n
+Britannicō | Britannicus –ī m. | Britannicus | n
 
 ### English
 
@@ -42,7 +48,7 @@ Claudiō Rōmam regente, Agrippīna, fēmina magnā avāritiā affecta, cum eō 
 9. Agrippina, provoked by this, pressed Nero with harsh words and began to help Britannicus. *(ptc. clause, pf. pass. irrītāta → subject: cause)*
 10. Nero, because he saw great danger in his brother, killed him too with poison. *(ptc. clause, pres. act. vidēns → subject: cause)*
 11. As the poison quickly overcame Britannicus in front of many people, Agrippina, recognizing the truth, grieved greatly inside. *(abl. abs., pres. act. vincente: time — ptc. clause, pres. act. cognōscēns → subject: time/cause)*
-12. Four years later Nero, since he wanted to kill his mother, invited her to the sea. *(ptc. clause, pres. act. cupiēns → subject: cause)*
+12. Four years later Nero, forming a cruel plan against his mother, invited her to the sea. *(ptc. clause, pres. act. capiēns → subject: time/cause)*
 13. At night, while the stars were giving light, Agrippina was thrown into the sea by men who had been sent by Nero. *(abl. abs., pres. act. dantibus: time — ptc. clause, pf. pass. missīs → ablative of agent virīs)*
 14. Agrippina, however, since she was not overcome by the sea, bravely escaped from the water and, as the night was fading, came home. *(ptc. clause, pf. pass. victa → subject: cause — abl. abs., pres. act. vānēscente: time)*
 15. When this became known, Nero, gripped by great anger, sent cruel men to his mother. *(abl. abs., pf. pass. cognitā: time — ptc. clause, pf. pass. affectus → subject: cause)*
