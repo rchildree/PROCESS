@@ -20,8 +20,11 @@ describe('identify and pos', () => {
     expect(ok(checkIdentify(L(), 'Caesare', 'caesar-n'))).toBe(true)
   })
   test('pos', () => {
-    expect(ok(checkPos(L(), 'amātus', 'amo-v', 'V'))).toBe(true)
-    expect(ok(checkPos(L(), 'amātus', 'amo-v', 'ADJ'))).toBe(true)
+    // A participle is its own part of speech: never V or ADJ.
+    expect(ok(checkPos(L(), 'amātus', 'amo-v', 'PTC'))).toBe(true)
+    expect(ok(checkPos(L(), 'amātus', 'amo-v', 'V'))).toBe(false)
+    expect(ok(checkPos(L(), 'amātus', 'amo-v', 'ADJ'))).toBe(false)
+    expect(ok(checkPos(L(), 'amat', 'amo-v', 'PTC'))).toBe(false)
     expect(ok(checkPos(L(), 'et', 'et-conj', 'CONJ'))).toBe(true)
     expect(ok(checkPos(L(), 'et', 'et-conj', 'ADV'))).toBe(false)
     expect(ok(checkPos(L(), 'medicus', 'medicus-n', 'V'))).toBe(false)

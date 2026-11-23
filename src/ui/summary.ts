@@ -6,7 +6,7 @@ import { participleName, STEM_NAME } from '../core/stems.ts'
 import type { Lexicon } from '../core/types.ts'
 
 export const POS_NAME: Record<string, string> = {
-  N: 'Noun', ADJ: 'Adjective', PRO: 'Pronoun', V: 'Verb', ADV: 'Adverb', PREP: 'Preposition', CONJ: 'Conjunction', OTHER: 'Other',
+  N: 'Noun', ADJ: 'Adjective', PRO: 'Pronoun', V: 'Verb', PTC: 'Participle', ADV: 'Adverb', PREP: 'Preposition', CONJ: 'Conjunction', OTHER: 'Other',
 }
 export const CASE_ABBR: Record<string, string> = { nom: 'nom', gen: 'gen', dat: 'dat', acc: 'acc', abl: 'abl', voc: 'voc', loc: 'loc' }
 
@@ -25,7 +25,8 @@ export function labelOf(st: SessionState, i: number, words: WordState[] = st.wor
     switch (r.kind) {
       // A non-kernel word (——) gets no label at all.
       case 'label': case 'substantive': case 'predicate': label = r.label === '——' ? '' : r.label; break
-      case 'modifies': label = ''; break
+      case 'modifies': case 'circumstantial': label = ''; break
+      case 'ablAbs': label = 'abl. abs.'; break
       case 'verbPart': case 'aux': {
         const cp = findCompound({ ...st, words }, i)
         label = cp?.label ?? '…'
@@ -63,6 +64,9 @@ export function detailsOf(st: SessionState, i: number, words: WordState[] = st.w
   if (w.antecedent !== undefined) lines.push(w.antecedent === null ? ['rel. (no antecedent)'] : ['rel. → ', la(w.antecedent)])
   const r = w.role
   if (r?.kind === 'modifies') lines.push(['→ ', la(r.target)])
+  if (r?.kind === 'circumstantial') lines.push(['→ ', la(r.target)], [r.idea])
+  if (r?.kind === 'ablAbs') lines.push(['subj. ', la(r.target)], [r.idea])
+  if ((r?.kind === 'label' || r?.kind === 'substantive') && r.abs) lines.push(['abl. abs.'])
   if (r?.kind === 'substantive') lines.push(['subst.'])
   if (r?.kind === 'predicate') lines.push(['pred.'])
   if (r?.kind === 'verbPart' || r?.kind === 'aux') lines.push(['+ ', la(r.target)])
@@ -84,10 +88,12 @@ export const STEP_NAME: Record<StepId, string> = {
 
 function roleText(r: Role, word: (j: number) => string): string {
   switch (r.kind) {
-    case 'label': return r.label
+    case 'label': return r.abs ? `${r.label} of an ablative absolute` : r.label
     case 'modifies': return `modifies ${word(r.target)}`
+    case 'circumstantial': return `circumstantial (${r.idea}), with ${word(r.target)}`
+    case 'ablAbs': return `ablative absolute (${r.idea}), subject ${word(r.target)}`
     case 'predicate': return `predicate ${r.label}`
-    case 'substantive': return `used as a noun: ${r.label}`
+    case 'substantive': return `used as a noun: ${r.label}${r.abs ? ' of an ablative absolute' : ''}`
     case 'verbPart': case 'aux': return `part of a verb with ${word(r.target)}`
   }
 }

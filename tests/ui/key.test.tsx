@@ -91,7 +91,7 @@ test('returning to an open page refreshes an older key with the teacher’s brea
   const text = 'īnstrūcta est.'
   const tokens = tokenize(text, (w) => lex().lookup(w).length > 0)
   const log: Answer[] = [
-    { step: 'identify', entryId: 'instruo-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'a' },
+    { step: 'identify', entryId: 'instruo-v' }, { step: 'pos', pos: 'PTC' }, { step: 'ending', ending: 'a' },
     { step: 'stem', stem: 'īnstrūct' }, { step: 'stemType', t: 'pfPass' },
     { step: 'nomForm', form: { c: 'nom', n: 'sg', g: 'f' } }, { step: 'nomRole', role: { kind: 'verbPart', target: 1 } },
     { step: 'identify', entryId: 'sum-v' }, { step: 'pos', pos: 'V' },

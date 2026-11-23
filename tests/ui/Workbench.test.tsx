@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, test } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Workbench } from '../../src/ui/Workbench.tsx'
 import { startSession, submit, type Answer } from '../../src/core/session.ts'
 import { tokenize } from '../../src/core/sets.ts'
@@ -22,7 +22,7 @@ test('the infinitive ending step does not announce that the word is an infinitiv
 })
 
 test('the participle form step uses the ordinary title', () => {
-  const st = at('appellātus', [{ step: 'identify', entryId: 'appello-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'us' },
+  const st = at('appellātus', [{ step: 'identify', entryId: 'appello-v' }, { step: 'pos', pos: 'PTC' }, { step: 'ending', ending: 'us' },
     { step: 'stem', stem: 'appellāt' }, { step: 'stemType', t: 'pfPass' }])
   expect(st.step).toBe('nomForm')
   render(<Workbench st={st} lex={lex()} onAnswer={() => {}} />)
@@ -36,7 +36,7 @@ test('the finite verb picker always offers imperative', () => {
 })
 
 test('a participle marks its stem after the ending', () => {
-  const st = at('appellātus', [{ step: 'identify', entryId: 'appello-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'us' }])
+  const st = at('appellātus', [{ step: 'identify', entryId: 'appello-v' }, { step: 'pos', pos: 'PTC' }, { step: 'ending', ending: 'us' }])
   render(<Workbench st={st} lex={lex()} onAnswer={() => {}} />)
   expect(screen.getByRole('heading').textContent).toBe('Mark the stem.')
 })
@@ -62,4 +62,37 @@ test('a change that breaks a later word says so', async () => {
   st = submit(st, { step: 'nomRole', role: { kind: 'label', label: 'S' } }, lex())
   render(<Workbench st={st} lex={lex()} onAnswer={() => {}} />)
   expect(screen.getByRole('alert').textContent).toMatch(/Chain broken.*puellae.*magnae/)
+})
+
+const rege: Answer[] = [{ step: 'identify', entryId: 'rex-n' }, { step: 'pos', pos: 'N' }, { step: 'ending', ending: 'e' }, { step: 'nomForm', form: { c: 'abl', n: 'sg', g: 'm' } }]
+const victo: Answer[] = [
+  { step: 'identify', entryId: 'vinco-v' }, { step: 'pos', pos: 'PTC' }, { step: 'ending', ending: 'ō' },
+  { step: 'stem', stem: 'vict' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: { c: 'abl', n: 'sg', g: 'm' } },
+]
+
+test('the part-of-speech step offers Participle', () => {
+  const st = at('victō', [{ step: 'identify', entryId: 'vinco-v' }])
+  render(<Workbench st={st} lex={lex()} onAnswer={() => {}} />)
+  expect(screen.getByRole('button', { name: 'Participle' })).toBeTruthy()
+})
+
+test('a noun can be chosen as the subject of an ablative absolute', () => {
+  const got: Answer[] = []
+  render(<Workbench st={at('rēge victō', rege)} lex={lex()} onAnswer={(a) => got.push(a)} />)
+  fireEvent.click(screen.getByRole('button', { name: /S \(abl\. abs\.\)/ }))
+  expect(got).toEqual([{ step: 'nomRole', role: { kind: 'label', label: 'S', abs: true } }])
+})
+
+test('a participle picks its use, then the clause idea, then its noun', () => {
+  const st = at('rēge victō', [...rege, { step: 'nomRole', role: { kind: 'label', label: 'S', abs: true } }, ...victo])
+  const got: Answer[] = []
+  render(<Workbench st={st} lex={lex()} onAnswer={(a) => got.push(a)} />)
+  expect(screen.getByRole('heading', { name: 'What does the participle do?' })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: /Attributive/ })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: /Circumstantial/ })).toBeTruthy()
+  // Each idea row (circumstantial, ablative absolute) has its own buttons: take the ablative absolute's.
+  fireEvent.click(screen.getAllByRole('button', { name: /causal/ })[1])
+  expect(screen.getByRole('heading', { name: 'Which word is the subject of the ablative absolute?' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'rēge' }))
+  expect(got).toEqual([{ step: 'nomRole', role: { kind: 'ablAbs', target: 0, idea: 'causal' } }])
 })

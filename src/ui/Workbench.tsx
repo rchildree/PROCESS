@@ -103,7 +103,6 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
   const entry = w?.entryId ? lex.entries.get(w.entryId) : undefined
   const options = optionsFor(st, lex)
   const wordAt = (j: number) => surfaceOf(st.tokens[j])
-  const isPtc = !!w?.entryId && w.pos === 'V' && w.path === 'nominal'
   const cp = tok ? findCompound(st, i) : undefined
   const row = { here: i, count: st.tokens.length, wordAt }
 
@@ -132,12 +131,13 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
     case 'nomRole': {
       if (isRelative(w)) {
         title = 'What is its function in its own clause?'
-        body = <RoleStep {...row} kind="noun" options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
+        body = <RoleStep {...row} kind="noun" relative options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
         break
       }
-      const kind = w.pos === 'N' ? 'noun' : w.pos === 'ADV' ? 'adverb' : w.pos === 'PRO' ? 'pronoun' : 'adjective'
-      title = kind === 'noun' ? 'What is its function?' : kind === 'adverb' ? 'ADV label applied.' : 'What does it do in the sentence?'
-      body = <RoleStep {...row} kind={kind} participle={isPtc} options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
+      const kind = w.pos === 'N' ? 'noun' : w.pos === 'ADV' ? 'adverb' : w.pos === 'PRO' ? 'pronoun' : w.pos === 'PTC' ? 'participle' : 'adjective'
+      title = kind === 'noun' ? 'What is its function?' : kind === 'adverb' ? 'ADV label applied.'
+        : kind === 'participle' ? 'What does the participle do?' : 'What does it do in the sentence?'
+      body = <RoleStep {...row} kind={kind} options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
       break
     }
     case 'personal':
@@ -216,7 +216,7 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
       body = <WordRow {...row} onPick={(target) => onAnswer({ step: 'ppPrep', target })} />
       break
     case 'clauseBoundary':
-      title = 'Does the ↓ clause end after this word?'
+      title = st.clauses[st.clauses.length - 1]?.abs ? 'Does the ablative absolute end after this word?' : 'Does the ↓ clause end after this word?'
       body = <ChoiceStep options={[{ value: 'no', label: 'Clause continues' }, { value: 'yes', label: 'Clause ends here' }]} onPick={(v) => onAnswer({ step: 'clauseBoundary', ends: v === 'yes' })} />
       break
     case 'encliticPos':

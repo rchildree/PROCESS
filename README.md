@@ -52,6 +52,24 @@ in `src/core/data/alternates.ts`.
 Function labels live in `src/core/data/labels.ts`; copular/factitive verb lists in
 `src/core/data/copular.ts`; ending tables in `src/core/data/endings.ts`.
 
+## Participles
+
+A participle is its own part of speech, **PTC**: a form that can only be a participle is never accepted as
+V or ADJ. After its ending, stem and case, the student chooses what it does:
+
+- **attributive** (adjectival): it modifies a noun;
+- **circumstantial** (adverbial): it agrees with a noun and adds a clause idea: temporal, causal,
+  concessive or conditional;
+- **ablative absolute**: it is the verb of its own clause, with the same four ideas;
+- or one of the other uses: substantive, predicate, or part of a verb with a form of *sum*.
+
+An ablative absolute is parsed as a clause. Its ablative noun takes **S (abl. abs.)**, offered wherever S is;
+a plain S on an ablative is refused. Whichever of the subject and the participle comes first opens the
+clause; words inside take their usual labels (O, PP, ——), no finite verb may appear inside, and the clause
+can end only once it has both its subject and its participle. In a key file this reads `S; abl. abs.` for
+the subject, `abl. abs. → 1 rēge; causal` for the participle, and `→ 1 Bellovacī; causal` for a
+circumstantial participle. Older saved work and keys that called a participle V are read as PTC.
+
 Sentences are worked in order: a student can open any sentence they've finished plus the first
 unfinished one, never one further ahead.
 

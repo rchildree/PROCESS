@@ -33,7 +33,7 @@ const PV: Answer[] = [
   ...noun('acies-n', 'ēs', nf('nom', 'sg', 'f'), 'S'),
   { step: 'identify', entryId: 'in-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
   ...noun('ager-n', 'ō', nf('abl', 'sg', 'm'), 'PP'), { step: 'ppPrep', target: 1 },
-  { step: 'identify', entryId: 'instruo-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'a' },
+  { step: 'identify', entryId: 'instruo-v' }, { step: 'pos', pos: 'PTC' }, { step: 'ending', ending: 'a' },
   { step: 'stem', stem: 'īnstrūct' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: nf('nom', 'sg', 'f') }, { step: 'nomRole', role: { kind: 'verbPart', target: 4 } },
   { step: 'identify', entryId: 'sum-v' }, { step: 'pos', pos: 'V' },
   { step: 'compoundForm', form: fin('pf', 'pass', '3', 'sg') }, { step: 'compoundRole', role: { kind: 'label', label: 'PV' } },

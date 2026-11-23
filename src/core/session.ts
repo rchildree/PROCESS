@@ -15,11 +15,21 @@ export type StepId =
   | 'compoundForm' | 'compoundRole' | 'prepCase' | 'conjType' | 'clauseBoundary' | 'encliticPos'
   | 'encliticConj' | 'sumUse' | 'completes' | 'ppPrep' | 'done'
 
+/** The clause idea a circumstantial participle or an ablative absolute adds to its sentence. */
+export type Idea = 'temporal' | 'causal' | 'concessive' | 'conditional'
+export const IDEAS: Idea[] = ['temporal', 'causal', 'concessive', 'conditional']
+
 export type Role =
-  | { kind: 'label'; label: Label }
+  /** `abs`: the subject (S) of an ablative absolute, which opens or completes that clause. */
+  | { kind: 'label'; label: Label; abs?: true }
+  /** For a participle: attributive (adjectival). */
   | { kind: 'modifies'; target: number }
   | { kind: 'predicate'; label: 'SC' | 'OC' }
-  | { kind: 'substantive'; label: Label }
+  | { kind: 'substantive'; label: Label; abs?: true }
+  /** A participle that agrees with a noun and adds a clause idea (Lesson 14). */
+  | { kind: 'circumstantial'; target: number; idea: Idea }
+  /** A participle that is the verb of an ablative absolute; `target` is the clause's subject (Lesson 15). */
+  | { kind: 'ablAbs'; target: number; idea: Idea }
   | { kind: 'verbPart'; target: number }
   | { kind: 'aux'; target: number }
 
@@ -86,7 +96,11 @@ export interface SessionState {
   openPP: { prep: number; c: Case; soft?: boolean; conj?: number } | null
   /** The prepositional phrase that just closed, so a following + can extend it (ex agrō et aquā). */
   lastPP: { prep: number; c: Case; closer: number } | null
-  clauses: { conj: number; hasFiniteVerb: boolean }[]
+  /**
+   * Open clauses, innermost last. `conj` is the word that opened it. An ablative absolute has no finite verb:
+   * its participle counts as the verb (hasFiniteVerb), and `abs` records its subject and participle once known.
+   */
+  clauses: Clause[]
   error: string | null
   log: Answer[]
   /** Which word and step each logged answer belongs to. */
@@ -94,6 +108,8 @@ export interface SessionState {
   /** Set while a changed earlier answer is being carried through the rest of the sentence. */
   editing: Editing | null
 }
+
+export interface Clause { conj: number; hasFiniteVerb: boolean; abs?: { subject?: number; verb?: number } }
 
 export interface Tagged { a: Answer; word: number; step: StepId }
 
@@ -128,7 +144,7 @@ export const ALL_PERSONS: Person[] = ['1', '2', '3']
 export const ALL_TENSES: Tense[] = ['pres', 'impf', 'fut', 'pf', 'plupf', 'futpf']
 export const ALL_MOODS: Mood[] = ['ind', 'subj', 'imp']
 export const ALL_VOICES: Voice[] = ['act', 'pass']
-export const ALL_POS: UiPos[] = ['N', 'ADJ', 'PRO', 'V', 'ADV', 'PREP', 'CONJ', 'OTHER']
+export const ALL_POS: UiPos[] = ['N', 'ADJ', 'PRO', 'V', 'PTC', 'ADV', 'PREP', 'CONJ', 'OTHER']
 
 // ---------- helpers ----------
 
@@ -152,7 +168,16 @@ export function isNounLike(w: WordState): boolean {
   return w.role.kind === 'label' && (w.pos === 'N' || w.pos === 'PRO')
 }
 
-export interface IncomingLink { from: number; kind: 'noun' | 'sum' | 'ptc' | 'cinf' }
+export interface IncomingLink { from: number; kind: 'noun' | 'abs' | 'sum' | 'ptc' | 'cinf' }
+
+/** Is this role the subject of an ablative absolute? */
+export const isAbsSubject = (r?: Role): r is Extract<Role, { kind: 'label' | 'substantive' }> => !!r && (r.kind === 'label' || r.kind === 'substantive') && !!r.abs
+
+/** The innermost open clause, if it is an ablative absolute. */
+const openAbs = (st: SessionState): Clause | undefined => {
+  const top = st.clauses[st.clauses.length - 1]
+  return top?.abs ? top : undefined
+}
 
 /** Earlier words that point forward to word j: an adjective to its noun, a participle to its sum, a sum to its participle. */
 export function incomingLinks(st: SessionState, j: number): IncomingLink[] {
@@ -160,7 +185,8 @@ export function incomingLinks(st: SessionState, j: number): IncomingLink[] {
   st.words.forEach((x, from) => {
     const r = x.role
     if (from >= j || !r || !('target' in r) || r.target !== j) return
-    if (r.kind === 'modifies') out.push({ from, kind: 'noun' })
+    if (r.kind === 'modifies' || r.kind === 'circumstantial') out.push({ from, kind: 'noun' })
+    if (r.kind === 'ablAbs') out.push({ from, kind: 'abs' })
     if (r.kind === 'verbPart') out.push({ from, kind: 'sum' })
     if (r.kind === 'aux') out.push({ from, kind: 'ptc' })
   })
@@ -175,7 +201,8 @@ const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
 function checkIncomingNoun(st: SessionState, i: number): string | null {
   const w = st.words[i]
   for (const l of incomingLinks(st, i)) {
-    if (l.kind !== 'noun') continue
+    if (l.kind === 'abs' && !isAbsSubject(w.role)) return `${quoted(st, l.from)} was linked to this word as the subject of its ablative absolute: choose “S (abl. abs.)”.`
+    if (l.kind !== 'noun' && l.kind !== 'abs') continue
     if (!isNounLike(w)) return `${quoted(st, l.from)} was linked to this word as its noun, but it is not used as a noun here.`
     const f = st.words[l.from].nomForm
     if (f && w.nomForm) {
@@ -189,7 +216,7 @@ function checkIncomingNoun(st: SessionState, i: number): string | null {
 /** Is word j, already parsed, a finite verb? A form of sum or participle waiting for its partner counts for now. */
 function isFiniteVerb(st: SessionState, j: number, pending = false): boolean {
   const w = st.words[j]
-  if (!w || w.pos !== 'V') return false
+  if (!w || (w.pos !== 'V' && w.pos !== 'PTC')) return false
   const cp = findCompound(st, j)
   if (cp?.form) return cp.form.k === 'fin'
   if (w.role?.kind === 'aux' || w.role?.kind === 'verbPart') return pending
@@ -276,12 +303,29 @@ function closePPIfObject(st: SessionState, i: number): SessionState {
 /** A nominal word's role is settled: close its prepositional phrase, open a relative clause, finish the word. */
 function afterNomRole(st: SessionState, i: number): SessionState {
   st = closePPIfObject(st, i)
+  const r = st.words[i].role
   if (isRelative(st.words[i])) {
-    const clauses = [...st.clauses, { conj: i, hasFiniteVerb: false }]
-    st = withWord({ ...st, clauses }, i, { clauseDepth: clauses.length })
+    st = openClause(st, i, { conj: i, hasFiniteVerb: false })
+  } else if (isAbsSubject(r)) {
+    // The participle came first and already opened this clause; otherwise the subject opens it.
+    if (openAbs(st)?.abs?.subject !== i) st = openClause(st, i, { conj: i, hasFiniteVerb: false, abs: { subject: i } })
+  } else if (r?.kind === 'ablAbs') {
+    if (r.target < i) {
+      const clauses = st.clauses.slice()
+      const top = clauses[clauses.length - 1]
+      clauses[clauses.length - 1] = { ...top, hasFiniteVerb: true, abs: { ...top.abs, verb: i } }
+      st = { ...st, clauses }
+    } else st = openClause(st, i, { conj: i, hasFiniteVerb: true, abs: { subject: r.target, verb: i } })
   }
   return finishWord(st)
 }
+
+function openClause(st: SessionState, i: number, c: Clause): SessionState {
+  const clauses = [...st.clauses, c]
+  return withWord({ ...st, clauses }, i, { clauseDepth: clauses.length })
+}
+
+const NO_FINITE_IN_ABS = 'An ablative absolute has no finite verb. Did it end before this word?'
 
 // ---------- role checks ----------
 
@@ -298,35 +342,44 @@ function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon)
     return role.kind === 'label' && role.label === 'ADV' ? { ok: true } : no('An adverb is labeled ADV.')
   }
   if (isRelative(w) && role.kind !== 'label') return no('Give the relative pronoun its function in its own clause.')
+  if (isAbsSubject(role)) {
+    if (isRelative(w)) return no('A relative pronoun cannot be the subject of an ablative absolute here.')
+    if (role.label !== 'S') return no('Only S can be the subject of an ablative absolute.')
+  }
+  const isPtc = w.pos === 'PTC'
+  if ((role.kind === 'circumstantial' || role.kind === 'ablAbs') && !isPtc) return no('Only a participle can do that.')
+  if (isPtc && (role.kind === 'modifies' || role.kind === 'circumstantial')) {
+    // A participle agreeing with the subject of an ablative absolute is that clause's verb.
+    const abs = openAbs(st)?.abs
+    if (abs && abs.verb === undefined && abs.subject === role.target) return no('That word is the subject of an ablative absolute: choose “ablative absolute”.')
+  }
   switch (role.kind) {
     case 'label':
       if (w.pos === 'ADJ') return no('Say what this adjective does: does it modify a noun, stand as a noun, or act as a predicate?')
+      if (isPtc) return no('Say what this participle does: does it modify a noun, form an ablative absolute, or stand as a noun?')
       if (gloss) return NOUN_LABELS.includes(role.label) ? { ok: true } : no('That label is not for nouns.')
-      return form ? checkNounLabel(form, role.label, openPP) : no('Missing case.')
+      return form ? checkNounLabel(form, role.label, openPP, !!role.abs) : no('Missing case.')
     case 'substantive':
       if (w.pos === 'N') return no('A noun is already a noun — just give its label.')
       if (gloss) return { ok: true }
-      return form ? checkNounLabel(form, role.label, openPP) : no('Missing case.')
+      return form ? checkNounLabel(form, role.label, openPP, !!role.abs) : no('Missing case.')
     case 'predicate': {
       if (w.pos === 'N') return no('Give the noun its label (SC or OC) directly.')
       if (!form) return no('Missing case.')
       return checkNounLabel(form, role.label, null)
     }
-    case 'modifies': {
-      if (w.pos === 'N') return no('A noun does not modify another noun here.')
-      const t = st.words[role.target]
-      if (!t || role.target === i) return no('Choose a noun in the sentence.')
-      if (role.target > i) {
-        // Not parsed yet: some reading of it must be able to agree.
-        const cands = lex.lookup(surfaceOf(st.tokens[role.target]))
-        // Glossed words carry no forms to check against: the check when the noun finishes still runs.
-        if (!form || !cands.length || cands.some((c) => !c.analyses.length)) return { ok: true }
-        const can = cands.some((c) => c.analyses.some((a) => a.c === form.c && a.n === form.n && a.g === form.g))
-        return can ? { ok: true } : no('That word cannot agree with this adjective.')
+    case 'ablAbs':
+      if (form && form.c !== 'abl') return no('A participle in an ablative absolute is in the ablative.')
+      if (role.target < i) {
+        const abs = openAbs(st)?.abs
+        if (!abs || abs.subject !== role.target || abs.verb !== undefined) return no('That word is not the subject of an open ablative absolute.')
       }
-      if (!isNounLike(t)) return no('That word is not being used as a noun.')
-      return form && t.nomForm ? checkAgreement(form, t.nomForm) : { ok: true }
-    }
+      return checkAgreesWith(st, i, role.target, lex)
+    case 'circumstantial':
+      return checkAgreesWith(st, i, role.target, lex)
+    case 'modifies':
+      if (w.pos === 'N') return no('A noun does not modify another noun here.')
+      return checkAgreesWith(st, i, role.target, lex)
     case 'verbPart': {
       const ptc = w.entryId ? analysesFor(lex, w.entryId, surfaceOf(st.tokens[i])).some((a) => a.k === 'ptc') : false
       if (!ptc) return no('Only a participle can be part of a verb.')
@@ -341,6 +394,24 @@ function checkNominalRole(st: SessionState, i: number, role: Role, lex: Lexicon)
       // Roles from older saves that no longer exist.
       return no('Choose what this word does.')
   }
+}
+
+/** A modifier (adjective, pronoun or participle) and the noun it goes with: a later noun only has to be able to agree. */
+function checkAgreesWith(st: SessionState, i: number, target: number, lex: Lexicon): Check {
+  const form = st.words[i].nomForm
+  const t = st.words[target]
+  const no = (reason: string): Check => ({ ok: false, reason })
+  if (!t || target === i) return no('Choose a noun in the sentence.')
+  if (target > i) {
+    // Not parsed yet: some reading of it must be able to agree.
+    const cands = lex.lookup(surfaceOf(st.tokens[target]))
+    // Glossed words carry no forms to check against: the check when the noun finishes still runs.
+    if (!form || !cands.length || cands.some((c) => !c.analyses.length)) return { ok: true }
+    const can = cands.some((c) => c.analyses.some((a) => a.c === form.c && a.n === form.n && a.g === form.g))
+    return can ? { ok: true } : no('That word cannot agree with this adjective.')
+  }
+  if (!isNounLike(t)) return no('That word is not being used as a noun.')
+  return form && t.nomForm ? checkAgreement(form, t.nomForm) : { ok: true }
 }
 
 function checkVerbRole(st: SessionState, i: number, role: Role, lex: Lexicon): Check {
@@ -439,9 +510,12 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
 
     case 'pos': {
       const asNoun = incomingLinks(st, i).find((l) => l.kind === 'noun')
-      if (asNoun && !['N', 'ADJ', 'PRO'].includes(a.pos)) return fail(st, `${quoted(st, asNoun.from)} was linked to this word as its noun.`)
+      const asAbs = incomingLinks(st, i).find((l) => l.kind === 'abs')
+      if ((asNoun || asAbs) && !['N', 'ADJ', 'PRO'].includes(a.pos)) return fail(st, `${quoted(st, (asNoun ?? asAbs)!.from)} was linked to this word as its noun.`)
       const asVerb = incomingLinks(st, i).find((l) => l.kind === 'sum' || l.kind === 'ptc')
-      if (asVerb && a.pos !== 'V') return fail(st, `${quoted(st, asVerb.from)} was linked to this word as part of a verb.`)
+      // A participle linked to a form of sum points at a verb; a form of sum linked to a participle points at a participle.
+      if (asVerb?.kind === 'sum' && a.pos !== 'V') return fail(st, `${quoted(st, asVerb.from)} was linked to this word as part of a verb.`)
+      if (asVerb?.kind === 'ptc' && a.pos !== 'PTC') return fail(st, `${quoted(st, asVerb.from)} was linked to this word as the participle of a verb.`)
       const asFinite = incomingLinks(st, i).find((l) => l.kind === 'cinf')
       if (asFinite && a.pos !== 'V') return fail(st, `${quoted(st, asFinite.from)} was linked to this word as the finite verb it completes.`)
       if (asVerb?.kind === 'sum') {
@@ -474,6 +548,8 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
         case 'V':
           if (w.entryId === 'sum-v') return { ...st, step: 'sumUse' }
           return verbPath(st, i, anAll)
+        case 'PTC':
+          return { ...withWord(st, i, { path: 'nominal' }), step: 'ending' }
         case 'ADV': return { ...withWord(st, i, { path: 'none' }), step: 'nomRole' }
         case 'PREP': return { ...st, step: 'prepCase' }
         case 'CONJ': return { ...st, step: 'conjType' }
@@ -487,7 +563,7 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       if (!c.ok) return fail(st, c.reason)
       st = withWord(st, i, { ending: a.ending })
       if (isRelative(st.words[i])) return { ...st, step: 'relNG' }
-      if (w.pos === 'V') return { ...st, step: 'stem' }
+      if (w.pos === 'V' || w.pos === 'PTC') return { ...st, step: 'stem' }
       return { ...st, step: 'nomForm' }
     }
 
@@ -593,6 +669,7 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
     case 'verbRole': {
       const c = checkVerbRole(st, i, a.role, lex)
       if (!c.ok) return fail(st, c.reason)
+      if (openAbs(st) && a.role.kind === 'label' && a.role.label !== 'CINF') return fail(st, NO_FINITE_IN_ABS)
       st = withWord(st, i, { role: a.role })
       if (a.role.kind === 'label' && a.role.label === 'CINF') return { ...st, step: 'completes' }
       if (w.verbForm?.k === 'fin' || w.verbForm?.k === 'imp' || (w.path === 'none' && !w.verbForm)) st = markFinite(st)
@@ -631,6 +708,7 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       if (a.role.label === 'CINF') return fail(st, 'Label the two words together with a verb label.')
       const c = checkVerbLabel(lex, st.words[cp.ptc].entryId!, cp.form, a.role.label)
       if (!c.ok) return fail(st, c.reason)
+      if (openAbs(st) && cp.form.k === 'fin') return fail(st, NO_FINITE_IN_ABS)
       st = withWord(st, cp.ptc, { compound: { ...cp, label: a.role.label } })
       // When sum came first, its clause was marked when it was linked.
       if (cp.form.k === 'fin' && cp.sum === i) st = markFinite(st)
@@ -695,6 +773,10 @@ function apply(st: SessionState, a: Answer, lex: Lexicon): SessionState {
       const top = st.clauses[st.clauses.length - 1]
       if (!top) return advance(st)
       if (a.ends) {
+        if (top.abs) {
+          if (top.abs.verb === undefined) return fail(st, 'This ablative absolute has no participle yet.')
+          if (top.abs.subject === undefined || !st.words[top.abs.subject]?.done) return fail(st, 'The subject of this ablative absolute has not come yet.')
+        }
         if (!top.hasFiniteVerb && !last) return fail(st, 'This clause has no finite verb yet.')
         const clauses = st.clauses.slice(0, -1)
         st = { ...st, clauses }
@@ -765,7 +847,12 @@ export function optionsFor(st: SessionState, _lex?: Lexicon): Options {
 export function replay(tokens: Token[], log: Answer[], lex: Lexicon): SessionState {
   let st = startSession(tokens)
   for (const a of log) {
-    const next = submit(st, a, lex)
+    let next = submit(st, a, lex)
+    // Saved work from before participles were their own part of speech called them V (or ADJ).
+    if (next.error && a.step === 'pos' && (a.pos === 'V' || a.pos === 'ADJ')) {
+      const asPtc = submit(st, { step: 'pos', pos: 'PTC' }, lex)
+      if (!asPtc.error) next = asPtc
+    }
     if (next.error) break
     st = next
   }

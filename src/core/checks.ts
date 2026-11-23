@@ -4,7 +4,7 @@ import { analysesFor } from './endings.ts'
 import type { Case, Check, Entry, Gender, Lexicon, Mood, Num, Person, Pos, Tense, Voice } from './types.ts'
 
 export type { Label }
-export type UiPos = 'N' | 'ADJ' | 'PRO' | 'V' | 'ADV' | 'PREP' | 'CONJ' | 'OTHER'
+export type UiPos = 'N' | 'ADJ' | 'PRO' | 'V' | 'PTC' | 'ADV' | 'PREP' | 'CONJ' | 'OTHER'
 export interface NomForm { c: Case; n: Num; g: Gender }
 export interface VerbForm { k: 'fin' | 'inf' | 'imp'; t: Tense; v: Voice; m?: Mood; p?: Person; n?: Num }
 
@@ -41,7 +41,10 @@ export function allowedPos(lex: Lexicon, surface: string, entryId: string): UiPo
   }
   if (e.pos === 'v') {
     const a = analysesFor(lex, entryId, surface)
-    if (a.length && a.every((x) => x.k === 'ptc' || x.k === 'ger')) out.add('ADJ')
+    // A participle is its own part of speech: a form that can only be a participle is never V or ADJ.
+    if (a.some((x) => x.k === 'ptc')) out.add('PTC')
+    if (a.length && a.every((x) => x.k === 'ptc')) out.delete('V')
+    else if (a.length && a.every((x) => x.k === 'ger')) out.add('ADJ')
   }
   return [...out]
 }
@@ -61,8 +64,14 @@ export function checkNomForm(lex: Lexicon, surface: string, entryId: string, f: 
   return no(`This form cannot be ${CASE_NAME[f.c]} ${f.n === 'sg' ? 'singular' : 'plural'}.`)
 }
 
-export function checkNounLabel(f: NomForm, label: Label, openPP: { case: Case; soft?: boolean } | null): Check {
+/** `abs`: the word is the subject (S) of an ablative absolute, so it must be an ablative S. */
+export function checkNounLabel(f: NomForm, label: Label, openPP: { case: Case; soft?: boolean } | null, abs = false): Check {
   if (!NOUN_LABELS.includes(label)) return no('That label is not for nouns.')
+  if (abs) {
+    if (label !== 'S') return no('Only S can be the subject of an ablative absolute.')
+    return f.c === 'abl' ? yes : no('The subject of an ablative absolute is in the ablative.')
+  }
+  if (label === 'S' && f.c === 'abl') return no('An ablative can be S only as the subject of an ablative absolute: choose “S (abl. abs.)”.')
   if (openPP && !openPP.soft && f.c === openPP.case && label !== 'PP') return no('This word is in the case the preposition takes.')
   if (label === 'PP') {
     if (!openPP) return no('There is no preposition for this word to belong to.')

@@ -56,11 +56,11 @@ dum māter multās lacrimās fundit, quae eam nōn adiuvant, puerī ab hominibus
 13 | quī       | qui-pron-2   | PRO  | nom pl m                  | S; rel. → 12 hominibus        | {"path":"nominal","ending":"ī"}
 14 | ab        | a-prep       | PREP | + abl                     | PP                            |
 15 | Amūliō    | gloss:Amūliō | N    |                           | PP; with 14 ab                | {"path":"none"}
-16 | missī     | mitto-v      | V    | nom pl m; pf pass ind 3pl | PV with 17 sunt               | {"path":"nominal","ending":"ī","stem":"miss","stemType":"pfPass","marker":null}
+16 | missī     | mitto-v      | PTC  | nom pl m; pf pass ind 3pl | PV with 17 sunt               | {"path":"nominal","ending":"ī","stem":"miss","stemType":"pfPass","marker":null}
 17 | sunt      | sum-v        | V    |                           | PV with 16 missī; clause ends | {"path":"none"}
 18 | ad        | ad-prep      | PREP | + acc                     | PP                            |
 19 | aquam     | aqua-n       | N    | acc sg f                  | PP; with 18 ad                | {"path":"nominal","ending":"am"}
-20 | ductī     | duco-v       | V    | nom pl m; pf pass ind 3pl | PV with 21 sunt               | {"path":"nominal","ending":"ī","stem":"duct","stemType":"pfPass","marker":null}
+20 | ductī     | duco-v       | PTC  | nom pl m; pf pass ind 3pl | PV with 21 sunt               | {"path":"nominal","ending":"ī","stem":"duct","stemType":"pfPass","marker":null}
 21 | sunt      | sum-v        | V    |                           | PV with 20 ductī              | {"path":"none"}
 
 ## 4
@@ -130,7 +130,7 @@ fēmina quācum Faustulus vīxit Acca appellāta est.
 3 | Faustulus | gloss:Faustulus | N   |                           | S                              | {"path":"none"}
 4 | vīxit     | vivo-v          | V   | pf act ind 3sg            | V; clause ends                 | {"path":"finite","personal":"it","stem":"vīx","stemType":"pfAct","marker":null}
 5 | Acca      | gloss:Acca      | N   |                           | SC                             | {"path":"none"}
-6 | appellāta | appello-v       | V   | nom sg f; pf pass ind 3sg | = with 7 est                   | {"path":"nominal","ending":"a","stem":"appellāt","stemType":"pfPass","marker":null}
+6 | appellāta | appello-v       | PTC | nom sg f; pf pass ind 3sg | = with 7 est                   | {"path":"nominal","ending":"a","stem":"appellāt","stemType":"pfPass","marker":null}
 7 | est       | sum-v           | V   |                           | = with 6 appellāta             | {"path":"none"}
 
 ## 9
@@ -144,7 +144,7 @@ puerī, quōs multum amāvit, mox magnī et fortēs factī sunt.
 6  | magnī  | magnus-adj | ADJ  | nom pl m                  | pred. SC          | {"path":"nominal","ending":"ī"}
 7  | et     | et-conj    | CONJ |                           | +                 |
 8  | fortēs | fortis-adj | ADJ  | nom pl m                  | pred. SC          | {"path":"nominal","ending":"ēs"}
-9  | factī  | fio-v      | V    | nom pl m; pf pass ind 3pl | = with 10 sunt    | {"path":"nominal","ending":"ī","stem":"fact","stemType":"pfPass","marker":null}
+9  | factī  | fio-v      | PTC  | nom pl m; pf pass ind 3pl | = with 10 sunt    | {"path":"nominal","ending":"ī","stem":"fact","stemType":"pfPass","marker":null}
 10 | sunt   | sum-v      | V    |                           | = with 9 factī    | {"path":"none"}
 
 ## 10
@@ -274,7 +274,7 @@ hanc lītem nōn ratiō sed vīs resolvit: Rōmulus frātrem, quōcum multōs an
 16 | magnā      | magnus-adj   | ADJ  | abl sg f                  | → 17 īrā                         | {"path":"nominal","ending":"ā"}
 17 | īrā        | ira-n        | N    | abl sg f                  | ——                               | {"path":"nominal","ending":"ā"}
 18 | plūrimum   | plurimum-adv | ADV  |                           | ADV                              | {"path":"none"}
-19 | affectus   | afficio-v    | V    | nom sg m; pf pass ind 3sg | PV with 20 est                   | {"path":"nominal","ending":"us","stem":"affect","stemType":"pfPass","marker":null}
+19 | affectus   | afficio-v    | PTC  | nom sg m; pf pass ind 3sg | PV with 20 est                   | {"path":"nominal","ending":"us","stem":"affect","stemType":"pfPass","marker":null}
 20 | est        | sum-v        | V    |                           | PV with 19 affectus; clause ends | {"path":"none"}
 
 ## 18
@@ -288,7 +288,7 @@ urbs autem, quam Rōmulus sine frātre condidit, Rōma appellāta est et mox mag
 6  | frātre    | frater-n       | N    | abl sg m                  | PP; with 5 sine    | {"path":"nominal","ending":"e"}
 7  | condidit  | condo-v        | V    | pf act ind 3sg            | V; clause ends     | {"path":"finite","personal":"it","stem":"condid","stemType":"pfAct","marker":null}
 8  | Rōma      | roma-n         | N    | nom sg f                  | SC                 | {"path":"nominal","ending":"a"}
-9  | appellāta | appello-v      | V    | nom sg f; pf pass ind 3sg | = with 10 est      | {"path":"nominal","ending":"a","stem":"appellāt","stemType":"pfPass","marker":null}
+9  | appellāta | appello-v      | PTC  | nom sg f; pf pass ind 3sg | = with 10 est      | {"path":"nominal","ending":"a","stem":"appellāt","stemType":"pfPass","marker":null}
 10 | est       | sum-v          | V    |                           | = with 9 appellāta | {"path":"none"}
 11 | et        | et-conj        | CONJ |                           | +                  |
 12 | mox       | mox-adv        | ADV  |                           | ADV                | {"path":"none"}

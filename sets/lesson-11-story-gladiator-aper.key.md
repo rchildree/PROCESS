@@ -30,7 +30,7 @@ quia populus novum mūnus vidēre cupīvit, gladiātor parvus ā Caesare prōduc
 8  | parvus    | parvus-adj  | ADJ  | nom sg m                  | → 7 gladiātor             | {"path":"nominal","ending":"us"}
 9  | ā         | a-prep      | PREP | + abl                     | PP                        |
 10 | Caesare   | caesar-n    | N    | abl sg m                  | PP; with 9 ā              | {"path":"nominal","ending":"e"}
-11 | prōductus | produco-v   | V    | nom sg m; pf pass ind 3sg | PV with 12 est            | {"path":"nominal","ending":"us","stem":"prōduct","stemType":"pfPass","marker":null}
+11 | prōductus | produco-v   | PTC  | nom sg m; pf pass ind 3sg | PV with 12 est            | {"path":"nominal","ending":"us","stem":"prōduct","stemType":"pfPass","marker":null}
 12 | est       | sum-v       | V    |                           | PV with 11 prōductus      | {"path":"none"}
 
 ## 3
@@ -131,7 +131,7 @@ quod aper gladiātōrem vidēre nōn potuit, ab eō facile interfectus est.
 7  | ab          | a-prep       | PREP | + abl                     | PP                       |
 8  | eō          | is-pron      | PRO  | abl sg m                  | PP; with 7 ab            | {"path":"nominal","ending":"ō"}
 9  | facile      | facile-adv   | ADV  |                           | ADV                      | {"path":"none"}
-10 | interfectus | interficio-v | V    | nom sg m; pf pass ind 3sg | PV with 11 est           | {"path":"nominal","ending":"us","stem":"interfect","stemType":"pfPass","marker":null}
+10 | interfectus | interficio-v | PTC  | nom sg m; pf pass ind 3sg | PV with 11 est           | {"path":"nominal","ending":"us","stem":"interfect","stemType":"pfPass","marker":null}
 11 | est         | sum-v        | V    |                           | PV with 10 interfectus   | {"path":"none"}
 
 ## 10

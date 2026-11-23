@@ -1,7 +1,7 @@
 // Answer keys: a teacher's finished parse written as plain lines (one per word), and read back.
 // The same lines can be built from a student's parse, so a later check can compare column by column.
 import type { Label, NomForm, UiPos, VerbForm } from './checks.ts'
-import { findCompound, surfaceOf, type Role, type SessionState, type WordState } from './session.ts'
+import { findCompound, IDEAS, isAbsSubject, surfaceOf, type Idea, type Role, type SessionState, type WordState } from './session.ts'
 import { STEM_TYPES } from './stems.ts'
 import type { SentenceSet, Token } from './sets.ts'
 import type { Case, Gender, Mood, Num, Person, Tense, Voice } from './types.ts'
@@ -57,12 +57,15 @@ export function keyWords(st: SessionState): KeyWord[] {
         case 'substantive': fn.push(`subst. ${r.label}`); break
         case 'predicate': fn.push(`pred. ${r.label}`); break
         case 'modifies': fn.push(`→ ${ref(r.target)}`); break
+        case 'circumstantial': fn.push(`→ ${ref(r.target)}`, r.idea); break
+        case 'ablAbs': fn.push(`abl. abs. → ${ref(r.target)}`, r.idea); break
         case 'verbPart': case 'aux': {
           const cp = findCompound(st, i)
           fn.push(`${cp?.label ?? '?'} with ${ref(r.target)}`)
           break
         }
       }
+      if (isAbsSubject(r)) fn.push('abl. abs.')
     }
     if (w.antecedent !== undefined) fn.push(w.antecedent === null ? 'rel. none' : `rel. → ${ref(w.antecedent)}`)
     if (w.completes !== undefined) fn.push(`completes ${ref(w.completes)}`)
@@ -128,7 +131,10 @@ export function parseKey(text: string): ParsedKey {
     if (!current) continue
     const cells = line.split('|').map((c) => c.trim())
     if (cells.length < 6 || !/^\d+$/.test(cells[0])) continue
-    current.push({ n: Number(cells[0]), word: cells[1], entry: cells[2], pos: cells[3], form: cells[4], fn: cells[5], ...(cells[6] ? { work: parseWork(cells[6], cells[0]) } : {}) })
+    const work = cells[6] ? parseWork(cells[6], cells[0]) : undefined
+    // Keys from before participles were their own part of speech called them V.
+    const pos = cells[3] === 'V' && work?.path === 'nominal' && work.stemType ? 'PTC' : cells[3]
+    current.push({ n: Number(cells[0]), word: cells[1], entry: cells[2], pos, form: cells[4], fn: cells[5], ...(work ? { work } : {}) })
   }
   return { setId, title, sentences }
 }
@@ -171,9 +177,14 @@ function keyWordState(k: KeyWord): WordState {
     else if (pc) w.prepCase = pc[1] as Case
   }
   let role: Role | undefined
+  let idea: Idea | undefined
+  let abs = false
   for (const f of parts(k.fn)) {
     let m: RegExpMatchArray | null
-    if ((m = f.match(/^→ (\d+)/))) role = { kind: 'modifies', target: target(m[1]) }
+    if ((m = f.match(/^abl\. abs\. → (\d+)/))) role = { kind: 'ablAbs', target: target(m[1]), idea: 'temporal' }
+    else if (f === 'abl. abs.') abs = true
+    else if (IDEAS.includes(f as Idea)) idea = f as Idea
+    else if ((m = f.match(/^→ (\d+)/))) role = { kind: 'modifies', target: target(m[1]) }
     else if ((m = f.match(/^subst\. (\S+)$/))) role = { kind: 'substantive', label: m[1] as Label }
     else if ((m = f.match(/^pred\. (SC|OC)$/))) role = { kind: 'predicate', label: m[1] as 'SC' | 'OC' }
     else if ((m = f.match(/^rel\. → (\d+)/))) w.antecedent = target(m[1])
@@ -195,6 +206,9 @@ function keyWordState(k: KeyWord): WordState {
     else if (f === '+' || f === '↓') { w.conjType = f; role ??= { kind: 'label', label: f } }
     else role = { kind: 'label', label: f as Label }
   }
+  if (role?.kind === 'modifies' && idea) role = { kind: 'circumstantial', target: role.target, idea }
+  if (role?.kind === 'ablAbs' && idea) role = { ...role, idea }
+  if (abs && (role?.kind === 'label' || role?.kind === 'substantive')) role = { ...role, abs: true }
   if (role) w.role = role
   return w
 }
@@ -222,7 +236,11 @@ export function wordsWithKey(words: WordState[], tokens: Token[], key: KeyWord[]
   out.forEach((w, i) => {
     const k = byIndex.get(i)
     if (!k) { depth = w.clauseDepth; return }
-    const opens = w.conjType === '↓' || w.antecedent !== undefined
+    const r = w.role
+    // An ablative absolute opens at whichever of its subject and participle comes first.
+    const absOpens = (r?.kind === 'ablAbs' && r.target > i)
+      || (isAbsSubject(r) && !out.some((x, j) => j < i && x.role?.kind === 'ablAbs' && x.role.target === i))
+    const opens = w.conjType === '↓' || w.antecedent !== undefined || absOpens
     if (opens) depth++
     w.clauseDepth = depth
     depth = Math.max(0, depth - closesOf(k))

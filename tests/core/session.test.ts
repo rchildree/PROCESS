@@ -62,7 +62,7 @@ describe('full sentences', () => {
       ...noun('caesar-n', 'e', nf('abl', 'sg', 'm'), 'PP'), { step: 'ppPrep', target: 3 },
       { step: 'identify', entryId: 'in-prep' }, { step: 'pos', pos: 'PREP' }, { step: 'prepCase', c: 'abl' },
       ...noun('ager-n', 'ō', nf('abl', 'sg', 'm'), 'PP'), { step: 'ppPrep', target: 5 },
-      { step: 'identify', entryId: 'instruo-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'a' },
+      { step: 'identify', entryId: 'instruo-v' }, { step: 'pos', pos: 'PTC' }, { step: 'ending', ending: 'a' },
       { step: 'stem', stem: 'īnstrūct' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: nf('nom', 'sg', 'f') }, { step: 'nomRole', role: { kind: 'verbPart', target: 8 } },
       { step: 'identify', entryId: 'sum-v' }, { step: 'pos', pos: 'V' },
       { step: 'compoundForm', form: fin('pf', 'pass', '3', 'sg') },
@@ -175,7 +175,7 @@ test('a correct answer after a rejected one is logged and clears the error', () 
 
 describe('two-word verbs', () => {
   const ptc: Answer[] = [
-    { step: 'identify', entryId: 'appello-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'us' },
+    { step: 'identify', entryId: 'appello-v' }, { step: 'pos', pos: 'PTC' }, { step: 'ending', ending: 'us' },
     { step: 'stem', stem: 'appellāt' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: nf('nom', 'sg', 'm') },
   ]
   const carbo = noun('carbo-n', '', nf('nom', 'sg', 'm'), 'S')
@@ -241,7 +241,7 @@ describe('review fixes', () => {
 
   test('two participles cannot share one form of sum', () => {
     const ptc: Answer[] = [
-      { step: 'identify', entryId: 'appello-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'us' },
+      { step: 'identify', entryId: 'appello-v' }, { step: 'pos', pos: 'PTC' }, { step: 'ending', ending: 'us' },
       { step: 'stem', stem: 'appellāt' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: nf('nom', 'sg', 'm') },
     ]
     const st = play('appellātus et appellātus est', [

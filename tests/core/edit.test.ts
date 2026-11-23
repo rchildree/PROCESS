@@ -164,7 +164,7 @@ describe('forward links and changes', () => {
 describe('verb links and changes', () => {
   const nf = (c: any, n: any, g: any) => ({ c, n, g })
   const ptc: Answer[] = [
-    { step: 'identify', entryId: 'appello-v' }, { step: 'pos', pos: 'V' }, { step: 'ending', ending: 'us' },
+    { step: 'identify', entryId: 'appello-v' }, { step: 'pos', pos: 'PTC' }, { step: 'ending', ending: 'us' },
     { step: 'stem', stem: 'appellāt' }, { step: 'stemType', t: 'pfPass' }, { step: 'nomForm', form: nf('nom', 'sg', 'm') },
   ]
   const together: Answer[] = [
