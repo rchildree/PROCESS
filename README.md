@@ -57,10 +57,11 @@ Function labels live in `src/core/data/labels.ts`; copular/factitive verb lists 
 A participle is its own part of speech, **PTC**: a form that can only be a participle is never accepted as
 V or ADJ. After its ending, stem and case, the student chooses what it does:
 
-- **attributive** (adjectival): it modifies a noun;
-- **circumstantial** (adverbial): it agrees with a noun and adds a clause idea: temporal, causal,
-  concessive or conditional;
-- **ablative absolute**: it is the verb of its own clause, with the same four ideas;
+- **adjectival**: it modifies a noun (picked on the next screen);
+- **adverbial** (circumstantial): it agrees with a noun and adds a clause idea: temporal, causal,
+  concessive or conditional (the idea, then the noun, on the next screens);
+- **ablative absolute**: it is the verb of its own clause, with the same four ideas (the idea, then its
+  subject; if an earlier ablative S already named this participle, that S is sent for checking without asking);
 - or one of the other uses: substantive, predicate, or part of a verb with a form of *sum*.
 
 An ablative absolute is parsed as a clause. Its ablative noun is labeled plain **S**; an ablative S then

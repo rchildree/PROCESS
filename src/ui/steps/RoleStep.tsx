@@ -11,6 +11,8 @@ interface Props {
   here: number
   count: number
   onRole: (r: Role) => void
+  /** An earlier ablative S that already named this participle: the ablative absolute's subject, no need to ask again. */
+  absSubject?: number
 }
 
 const labelName = (l: Label) => LABELS.find((x) => x.id === l)?.name ?? l
@@ -71,9 +73,12 @@ function PickWord({ heading, here, count, wordAt, onPick, onBack }: {
 }
 export { PickWord }
 
-export function RoleStep({ kind, options, wordAt, here, count, onRole }: Props) {
+type Use = 'adjectival' | 'circumstantial' | 'ablAbs'
+
+export function RoleStep({ kind, options, wordAt, here, count, onRole, absSubject }: Props) {
   const [sub, setSub] = useState<'substantive' | 'sum' | null>(null)
-  const [idea, setIdea] = useState<{ use: 'circumstantial' | 'ablAbs'; idea: Idea } | null>(null)
+  const [use, setUse] = useState<Use | null>(null)
+  const [idea, setIdea] = useState<Idea | null>(null)
 
   // An adverb only ever takes ADV: the label is applied, the student just moves on.
   if (kind === 'adverb') return <button type="button" className="primary" autoFocus onClick={() => onRole({ kind: 'label', label: 'ADV' })}>Continue</button>
@@ -85,10 +90,30 @@ export function RoleStep({ kind, options, wordAt, here, count, onRole }: Props) 
       onPick={(target) => onRole({ kind: 'verbPart', target })} onBack={() => setSub(null)} />
   }
 
-  if (idea) {
-    const heading = idea.use === 'ablAbs' ? 'Which word is the subject of the ablative absolute?' : 'Which noun does the participle agree with?'
+  if (use === 'adjectival') {
+    return <PickWord heading="Which noun does the participle modify?" here={here} count={count} wordAt={wordAt}
+      onPick={(target) => onRole({ kind: 'modifies', target })} onBack={() => setUse(null)} />
+  }
+
+  if (use && !idea) {
+    return (
+      <div className="roles">
+        <h4>{use === 'ablAbs' ? 'Ablative absolute: what idea does it add?' : 'Adverbial: what idea does it add?'}</h4>
+        <Ideas onPick={(i) => {
+          // An earlier S already named this participle: that S is the subject, so send it straight for checking.
+          if (use === 'ablAbs' && absSubject !== undefined) onRole({ kind: 'ablAbs', target: absSubject, idea: i })
+          else setIdea(i)
+        }} />
+        <button type="button" className="link" onClick={() => setUse(null)}>← back</button>
+      </div>
+    )
+  }
+
+  if (use && idea) {
+    const u = use as 'circumstantial' | 'ablAbs'
+    const heading = u === 'ablAbs' ? 'Which word is the subject of the ablative absolute?' : 'Which noun does the participle agree with?'
     return <PickWord heading={heading} here={here} count={count} wordAt={wordAt}
-      onPick={(target) => onRole({ kind: idea.use, target, idea: idea.idea })} onBack={() => setIdea(null)} />
+      onPick={(target) => onRole({ kind: u, target, idea })} onBack={() => setIdea(null)} />
   }
 
   if (kind === 'noun') {
@@ -113,16 +138,21 @@ export function RoleStep({ kind, options, wordAt, here, count, onRole }: Props) 
     return (
       <div className="roles">
         <section>
-          <h4>Attributive (adjectival): modifies a noun</h4>
-          <WordRow here={here} count={count} wordAt={wordAt} onPick={(target) => onRole({ kind: 'modifies', target })} />
-        </section>
-        <section>
-          <h4>Circumstantial (adverbial): agrees with a noun and adds…</h4>
-          <Ideas onPick={(i) => setIdea({ use: 'circumstantial', idea: i })} />
-        </section>
-        <section>
-          <h4>Ablative absolute: the verb of its own clause, adding…</h4>
-          <Ideas onPick={(i) => setIdea({ use: 'ablAbs', idea: i })} />
+          <h4>Main uses</h4>
+          <div className="choices">
+            <button type="button" onClick={() => setUse('adjectival')}>
+              <span className="choice-label">adjectival</span>
+              <span className="choice-hint">modifies a noun</span>
+            </button>
+            <button type="button" onClick={() => setUse('circumstantial')}>
+              <span className="choice-label">adverbial</span>
+              <span className="choice-hint">agrees with a noun, adds a clause idea</span>
+            </button>
+            <button type="button" onClick={() => setUse('ablAbs')}>
+              <span className="choice-label">ablative absolute</span>
+              <span className="choice-hint">the verb of its own clause</span>
+            </button>
+          </div>
         </section>
         <section>
           <h4>Other uses</h4>

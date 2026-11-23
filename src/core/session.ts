@@ -22,7 +22,7 @@ export const IDEAS: Idea[] = ['temporal', 'causal', 'concessive', 'conditional']
 export type Role =
   /** `abs`: the subject (S) of an ablative absolute. Set by the app once the S names its participle, never chosen directly. */
   | { kind: 'label'; label: Label; abs?: true }
-  /** For a participle: attributive (adjectival). */
+  /** For a participle: adjectival (modifies a noun). */
   | { kind: 'modifies'; target: number }
   | { kind: 'predicate'; label: 'SC' | 'OC' }
   | { kind: 'substantive'; label: Label; abs?: true }

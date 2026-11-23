@@ -86,16 +86,35 @@ test('an ablative S then picks the participle it is the subject of', () => {
   expect(got).toEqual([{ step: 'subjectOf', target: 1 }])
 })
 
-test('a participle picks its use, then the clause idea, then its noun', () => {
+test('a participle picks its use, then the clause idea; an S that named it is its subject, unasked', () => {
   const st = at('rēge victō', [...rege, { step: 'nomRole', role: { kind: 'label', label: 'S' } }, { step: 'subjectOf', target: 1 }, ...victo])
   const got: Answer[] = []
   render(<Workbench st={st} lex={lex()} onAnswer={(a) => got.push(a)} />)
   expect(screen.getByRole('heading', { name: 'What does the participle do?' })).toBeTruthy()
-  expect(screen.getByRole('heading', { name: /Attributive/ })).toBeTruthy()
-  expect(screen.getByRole('heading', { name: /Circumstantial/ })).toBeTruthy()
-  // Each idea row (circumstantial, ablative absolute) has its own buttons: take the ablative absolute's.
-  fireEvent.click(screen.getAllByRole('button', { name: /causal/ })[1])
+  expect(screen.getByRole('button', { name: /adjectival/ })).toBeTruthy()
+  expect(screen.getByRole('button', { name: /adverbial/ })).toBeTruthy()
+  // No word row on the first screen: the noun is picked on a later one.
+  expect(screen.queryByRole('button', { name: 'rēge' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: /ablative absolute/ }))
+  fireEvent.click(screen.getByRole('button', { name: /causal/ }))
+  expect(got).toEqual([{ step: 'nomRole', role: { kind: 'ablAbs', target: 0, idea: 'causal' } }])
+})
+
+test('a participle that comes first picks its idea, then its subject', () => {
+  const got: Answer[] = []
+  render(<Workbench st={at('victō rēge', victo)} lex={lex()} onAnswer={(a) => got.push(a)} />)
+  fireEvent.click(screen.getByRole('button', { name: /ablative absolute/ }))
+  fireEvent.click(screen.getByRole('button', { name: /temporal/ }))
   expect(screen.getByRole('heading', { name: 'Which word is the subject of the ablative absolute?' })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'rēge' }))
-  expect(got).toEqual([{ step: 'nomRole', role: { kind: 'ablAbs', target: 0, idea: 'causal' } }])
+  expect(got).toEqual([{ step: 'nomRole', role: { kind: 'ablAbs', target: 1, idea: 'temporal' } }])
+})
+
+test('an adjectival participle picks its noun on the next screen', () => {
+  const got: Answer[] = []
+  render(<Workbench st={at('victō rēge', victo)} lex={lex()} onAnswer={(a) => got.push(a)} />)
+  fireEvent.click(screen.getByRole('button', { name: /adjectival/ }))
+  expect(screen.getByRole('heading', { name: 'Which noun does the participle modify?' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'rēge' }))
+  expect(got).toEqual([{ step: 'nomRole', role: { kind: 'modifies', target: 1 } }])
 })

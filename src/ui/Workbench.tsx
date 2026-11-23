@@ -137,7 +137,9 @@ export function Workbench({ st, lex, onAnswer, onNext, mode = 'help', reviewing 
       const kind = w.pos === 'N' ? 'noun' : w.pos === 'ADV' ? 'adverb' : w.pos === 'PRO' ? 'pronoun' : w.pos === 'PTC' ? 'participle' : 'adjective'
       title = kind === 'noun' ? 'What is its function?' : kind === 'adverb' ? 'ADV label applied.'
         : kind === 'participle' ? 'What does the participle do?' : 'What does it do in the sentence?'
-      body = <RoleStep {...row} kind={kind} options={options} wordAt={wordAt} onRole={(role) => onAnswer({ step: 'nomRole', role })} />
+      const absSubject = st.words.findIndex((x, j) => j < i && x.subjectOf === i)
+      body = <RoleStep key={i} {...row} kind={kind} options={options} wordAt={wordAt} absSubject={absSubject >= 0 ? absSubject : undefined}
+        onRole={(role) => onAnswer({ step: 'nomRole', role })} />
       break
     }
     case 'personal':
